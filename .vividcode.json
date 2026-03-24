@@ -1,0 +1,38 @@
+{
+  "$schema": "./vividcode-schema.json",
+  "providers": {
+    "anthropic": {
+      "apiKey": "",
+      "disabled": true
+    },
+    "qwen": {
+      "apiKey": "sk-b3dd28826a5848ccb11a721632620e86",
+      "disabled": false
+    }
+  },
+  "agents": {
+    "coder": {
+      "model": "qwen3-coder-plus",
+      "maxTokens": 5000
+    },
+    "summarizer": {
+      "model": "qwen3-coder-plus",
+      "maxTokens": 5000
+    },
+    "task": {
+      "model": "qwen3-coder-plus",
+      "maxTokens": 5000
+    },
+    "title": {
+      "model": "qwen3-coder-plus",
+      "maxTokens": 80
+    }
+  },
+  "lsp": {
+    "gopls": {
+      "command": "gopls"
+    }
+  },
+  "debug": false,
+  "autoCompact": true
+}
