@@ -10,9 +10,9 @@ import (
 	"runtime"
 	"strings"
 
+	"github.com/spf13/viper"
 	"github.com/vividcode-ai/vividcode/internal/llm/models"
 	"github.com/vividcode-ai/vividcode/internal/logging"
-	"github.com/spf13/viper"
 )
 
 // MCPType defines the type of MCP (Model Control Protocol) server.
@@ -273,6 +273,9 @@ func setProviderDefaults() {
 	if apiKey := os.Getenv("XAI_API_KEY"); apiKey != "" {
 		viper.SetDefault("providers.xai.apiKey", apiKey)
 	}
+	if apiKey := os.Getenv("MINIMAX_API_KEY"); apiKey != "" {
+		viper.SetDefault("providers.minimax.apiKey", apiKey)
+	}
 	if apiKey := os.Getenv("AZURE_OPENAI_ENDPOINT"); apiKey != "" {
 		// api-key may be empty when using Entra ID credentials – that's okay
 		viper.SetDefault("providers.azure.apiKey", os.Getenv("AZURE_OPENAI_API_KEY"))
@@ -355,6 +358,15 @@ func setProviderDefaults() {
 		viper.SetDefault("agents.summarizer.model", models.XAIGrok3Beta)
 		viper.SetDefault("agents.task.model", models.XAIGrok3Beta)
 		viper.SetDefault("agents.title.model", models.XAiGrok3MiniFastBeta)
+		return
+	}
+
+	// MiniMax configuration
+	if key := viper.GetString("providers.minimax.apiKey"); strings.TrimSpace(key) != "" {
+		viper.SetDefault("agents.coder.model", models.MiniMaxM2_7)
+		viper.SetDefault("agents.summarizer.model", models.MiniMaxM2_7)
+		viper.SetDefault("agents.task.model", models.MiniMaxM2_5)
+		viper.SetDefault("agents.title.model", models.MiniMaxM2_5)
 		return
 	}
 
@@ -663,6 +675,8 @@ func getProviderAPIKey(provider models.ModelProvider) string {
 		if hasVertexAICredentials() {
 			return "vertex-ai-credentials-available"
 		}
+	case models.ProviderMiniMax:
+		return os.Getenv("MINIMAX_API_KEY")
 	}
 	return ""
 }
@@ -808,6 +822,19 @@ func setDefaultModelForAgent(agent AgentName) bool {
 
 		cfg.Agents[agent] = Agent{
 			Model:     model,
+			MaxTokens: maxTokens,
+		}
+		return true
+	}
+
+	if apiKey := os.Getenv("MINIMAX_API_KEY"); apiKey != "" {
+		maxTokens := int64(5000)
+		if agent == AgentTitle {
+			maxTokens = 80
+		}
+
+		cfg.Agents[agent] = Agent{
+			Model:     models.MiniMaxM2_7,
 			MaxTokens: maxTokens,
 		}
 		return true
