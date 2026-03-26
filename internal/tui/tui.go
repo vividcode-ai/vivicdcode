@@ -5,13 +5,11 @@ import (
 	"fmt"
 	"image"
 	"math/rand"
-	"os"
 	"strings"
 
 	"charm.land/bubbles/v2/key"
 	tea "charm.land/bubbletea/v2"
 	uv "github.com/charmbracelet/ultraviolet"
-	uvlayout "github.com/charmbracelet/ultraviolet/layout"
 	"github.com/charmbracelet/ultraviolet/screen"
 	"github.com/vividcode-ai/vividcode/internal/app"
 	"github.com/vividcode-ai/vividcode/internal/config"
@@ -744,17 +742,11 @@ func (a appModel) generateLayout(w, h int) uiLayout {
 	editorHeight := 5
 	statusHeight := 1
 
-	appRect, statusRect := uvlayout.SplitVertical(area, uvlayout.Fixed(statusHeight))
+	mainHeight := h - editorHeight - statusHeight
 
-	mainRect, editorRect := uvlayout.SplitVertical(appRect, uvlayout.Fixed(editorHeight))
-
-	mainRect.Min.Y += 1
-	mainRect.Max.Y -= 1
-	mainRect.Min.X += 1
-	mainRect.Max.X -= 1
-
-	editorRect.Min.X += 1
-	editorRect.Max.X -= 1
+	mainRect := image.Rect(1, 1, w-1, mainHeight)
+	editorRect := image.Rect(1, mainHeight, w-1, mainHeight+editorHeight)
+	statusRect := image.Rect(0, mainHeight+editorHeight, w, h)
 
 	return uiLayout{
 		area:   area,
@@ -782,11 +774,23 @@ func (a appModel) Draw(scr uv.Screen, area uv.Rectangle) *tea.Cursor {
 
 	screen.Clear(scr)
 
-	mainContent := a.pages[a.currentPage].View().Content
-	uv.NewStyledString(mainContent).Draw(scr, a.layout.main)
+	if drawable, ok := a.pages[a.currentPage].(interface {
+		Draw(scr uv.Screen, area uv.Rectangle) *tea.Cursor
+	}); ok {
+		drawable.Draw(scr, a.layout.main)
+	} else {
+		mainContent := a.pages[a.currentPage].View().Content
+		uv.NewStyledString(mainContent).Draw(scr, a.layout.main)
+	}
 
-	statusContent := a.status.View().Content
-	uv.NewStyledString(statusContent).Draw(scr, a.layout.status)
+	if statusDrawable, ok := a.status.(interface {
+		Draw(scr uv.Screen, area uv.Rectangle) *tea.Cursor
+	}); ok {
+		statusDrawable.Draw(scr, a.layout.status)
+	} else {
+		statusContent := a.status.View().Content
+		uv.NewStyledString(statusContent).Draw(scr, a.layout.status)
+	}
 
 	if a.showHelp {
 		a.help.Draw(scr, area)
@@ -858,58 +862,28 @@ func (a appModel) View() tea.View {
 
 func New(app *app.App) tea.Model {
 	startPage := page.ChatPage
-	fmt.Fprintf(os.Stderr, "DEBUG New: Creating appModel...\n")
-
-	fmt.Fprintf(os.Stderr, "DEBUG New: 1. Creating status...\n")
-	status := core.NewStatusCmp(app.LSPClients)
-	fmt.Fprintf(os.Stderr, "DEBUG New: 2. Creating help...\n")
-	help := dialog.NewHelpCmp()
-	fmt.Fprintf(os.Stderr, "DEBUG New: 3. Creating quit...\n")
-	quit := dialog.NewQuitCmp()
-	fmt.Fprintf(os.Stderr, "DEBUG New: 4. Creating sessionDialog...\n")
-	sessionDialog := dialog.NewSessionDialogCmp()
-	fmt.Fprintf(os.Stderr, "DEBUG New: 5. Creating commandDialog...\n")
-	commandDialog := dialog.NewCommandDialogCmp()
-	fmt.Fprintf(os.Stderr, "DEBUG New: 6. Creating modelDialog...\n")
-	modelDialog := dialog.NewModelDialogCmp()
-	fmt.Fprintf(os.Stderr, "DEBUG New: 7. Creating permissions...\n")
-	permissions := dialog.NewPermissionDialogCmp()
-	fmt.Fprintf(os.Stderr, "DEBUG New: 8. Creating initDialog...\n")
-	initDialog := dialog.NewInitDialogCmp()
-	fmt.Fprintf(os.Stderr, "DEBUG New: 9. Creating themeDialog...\n")
-	themeDialog := dialog.NewThemeDialogCmp()
-	fmt.Fprintf(os.Stderr, "DEBUG New: 10. Creating chatPage...\n")
-	chatPage := page.NewChatPage(app)
-	fmt.Fprintf(os.Stderr, "DEBUG New: 11. Creating logsPage...\n")
-	logsPage := page.NewLogsPage()
-	fmt.Fprintf(os.Stderr, "DEBUG New: 12. Creating filepicker...\n")
-	filepicker := dialog.NewFilepickerCmp(app)
-	fmt.Fprintf(os.Stderr, "DEBUG New: 13. Creating overlay...\n")
-	overlay := render.NewOverlay()
-	fmt.Fprintf(os.Stderr, "DEBUG New: 14. Assembling model...\n")
 
 	model := &appModel{
 		currentPage:   startPage,
 		loadedPages:   make(map[page.PageID]bool),
-		status:        status,
-		help:          help,
-		quit:          quit,
-		sessionDialog: sessionDialog,
-		commandDialog: commandDialog,
-		modelDialog:   modelDialog,
-		permissions:   permissions,
-		initDialog:    initDialog,
-		themeDialog:   themeDialog,
+		status:        core.NewStatusCmp(app.LSPClients),
+		help:          dialog.NewHelpCmp(),
+		quit:          dialog.NewQuitCmp(),
+		sessionDialog: dialog.NewSessionDialogCmp(),
+		commandDialog: dialog.NewCommandDialogCmp(),
+		modelDialog:   dialog.NewModelDialogCmp(),
+		permissions:   dialog.NewPermissionDialogCmp(),
+		initDialog:    dialog.NewInitDialogCmp(),
+		themeDialog:   dialog.NewThemeDialogCmp(),
 		app:           app,
 		commands:      []dialog.Command{},
 		pages: map[page.PageID]tea.Model{
-			page.ChatPage: chatPage,
-			page.LogsPage: logsPage,
+			page.ChatPage: page.NewChatPage(app),
+			page.LogsPage: page.NewLogsPage(),
 		},
-		filepicker: filepicker,
-		dialog:     overlay,
+		filepicker: dialog.NewFilepickerCmp(app),
+		dialog:     render.NewOverlay(),
 	}
-	fmt.Fprintf(os.Stderr, "DEBUG New: appModel created, registering commands...\n")
 
 	model.RegisterCommand(dialog.Command{
 		ID:          "init",

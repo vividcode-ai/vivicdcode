@@ -214,8 +214,7 @@ func (p *chatPage) BindingKeys() []key.Binding {
 }
 
 func (p *chatPage) Draw(scr uv.Screen, area uv.Rectangle) *tea.Cursor {
-	view := p.View().Content
-	uv.NewStyledString(view).Draw(scr, area)
+	p.layout.Draw(scr, area)
 	return nil
 }
 

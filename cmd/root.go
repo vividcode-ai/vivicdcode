@@ -115,15 +115,11 @@ to assist developers in writing, debugging, and understanding code directly from
 
 		// Interactive mode
 		// Set up the TUI
-		fmt.Fprintf(os.Stderr, "DEBUG: Creating TUI model...\n")
 		tuiModel := tui.New(app)
-		fmt.Fprintf(os.Stderr, "DEBUG: TUI model created: %+v\n", tuiModel)
-		fmt.Fprintf(os.Stderr, "DEBUG: Creating tea.Program...\n")
 		program := tea.NewProgram(
 			tuiModel,
 			tea.WithEnvironment(os.Environ()),
 		)
-		fmt.Fprintf(os.Stderr, "DEBUG: tea.Program created\n")
 
 		// Setup the subscriptions, this will send services events to the TUI
 		ch, cancelSubs := setupSubscriptions(app, ctx)

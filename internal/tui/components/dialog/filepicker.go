@@ -376,43 +376,19 @@ func (f *filepickerCmp) IsCWDFocused() bool {
 }
 
 func NewFilepickerCmp(app *app.App) FilepickerCmp {
-	fmt.Fprintf(os.Stderr, "DEBUG NewFilepickerCmp: 1. Getting home dir...\n")
-	fflush()
 	homepath, err := os.UserHomeDir()
 	if err != nil {
 		logging.Error("error loading user files")
 		return nil
 	}
-	fmt.Fprintf(os.Stderr, "DEBUG NewFilepickerCmp: 2. Creating baseDir...\n")
-	fflush()
 	baseDir := DirNode{parent: nil, directory: homepath}
-	fmt.Fprintf(os.Stderr, "DEBUG NewFilepickerCmp: 3. Reading dir...\n")
-	fflush()
 	dirs := readDir(homepath, false)
-	fmt.Fprintf(os.Stderr, "DEBUG NewFilepickerCmp: 4. Creating viewport...\n")
-	fflush()
 	viewport := viewport.New(viewport.WithWidth(0), viewport.WithHeight(0))
-	fmt.Fprintf(os.Stderr, "DEBUG NewFilepickerCmp: 4b. Viewport created\n")
-	fflush()
-	fmt.Fprintf(os.Stderr, "DEBUG NewFilepickerCmp: 5. Creating textinput...\n")
-	fflush()
 	currentDirectory := textinput.New()
-	fmt.Fprintf(os.Stderr, "DEBUG NewFilepickerCmp: 5b. Textinput created\n")
-	fflush()
-	fmt.Fprintf(os.Stderr, "DEBUG NewFilepickerCmp: 5c. Setting char limit...\n")
-	fflush()
 	currentDirectory.CharLimit = 200
-	fmt.Fprintf(os.Stderr, "DEBUG NewFilepickerCmp: 5d. Setting width...\n")
-	fflush()
 	currentDirectory.SetWidth(44)
-	fmt.Fprintf(os.Stderr, "DEBUG NewFilepickerCmp: 5e. Setting value...\n")
-	fflush()
 	currentDirectory.SetValue(baseDir.directory)
-	fmt.Fprintf(os.Stderr, "DEBUG NewFilepickerCmp: 6. Creating stack...\n")
-	fflush()
 	stack := make(stack, 0)
-	fmt.Fprintf(os.Stderr, "DEBUG NewFilepickerCmp: 7. Creating filepickerCmp...\n")
-	fflush()
 	return &filepickerCmp{cwdDetails: &baseDir, dirs: dirs, cursorChain: stack, viewport: viewport, cwd: currentDirectory, app: app}
 }
 
