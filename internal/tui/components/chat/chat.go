@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"sort"
 
-	"github.com/charmbracelet/lipgloss"
+	"charm.land/lipgloss/v2"
 	"github.com/charmbracelet/x/ansi"
 	"github.com/vividcode-ai/vividcode/internal/config"
 	"github.com/vividcode-ai/vividcode/internal/message"
@@ -45,7 +45,7 @@ func lspsConfigured(width int) string {
 
 	lsps := baseStyle.
 		Width(width).
-		Foreground(t.Primary()).
+		Foreground(lipgloss.Color(t.Primary())).
 		Bold(true).
 		Render(title)
 
@@ -60,14 +60,14 @@ func lspsConfigured(width int) string {
 	for _, name := range lspNames {
 		lsp := cfg.LSP[name]
 		lspName := baseStyle.
-			Foreground(t.Text()).
+			Foreground(lipgloss.Color(t.Text())).
 			Render(fmt.Sprintf("• %s", name))
 
 		cmd := lsp.Command
 		cmd = ansi.Truncate(cmd, width-lipgloss.Width(lspName)-3, "…")
 
 		lspPath := baseStyle.
-			Foreground(t.TextMuted()).
+			Foreground(lipgloss.Color(t.TextMuted())).
 			Render(fmt.Sprintf(" (%s)", cmd))
 
 		lspViews = append(lspViews,
@@ -103,7 +103,7 @@ func logo(width int) string {
 	baseStyle := styles.BaseStyle()
 
 	versionText := baseStyle.
-		Foreground(t.TextMuted()).
+		Foreground(lipgloss.Color(t.TextMuted())).
 		Render(version.Version)
 
 	return baseStyle.
@@ -124,7 +124,7 @@ func repo(width int) string {
 	t := theme.CurrentTheme()
 
 	return styles.BaseStyle().
-		Foreground(t.TextMuted()).
+		Foreground(lipgloss.Color(t.TextMuted())).
 		Width(width).
 		Render(repo)
 }
@@ -134,8 +134,7 @@ func cwd(width int) string {
 	t := theme.CurrentTheme()
 
 	return styles.BaseStyle().
-		Foreground(t.TextMuted()).
+		Foreground(lipgloss.Color(t.TextMuted())).
 		Width(width).
 		Render(cwd)
 }
-

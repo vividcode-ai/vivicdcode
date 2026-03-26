@@ -1,9 +1,10 @@
 package layout
 
 import (
-	"github.com/charmbracelet/bubbles/key"
-	tea "github.com/charmbracelet/bubbletea"
-	"github.com/charmbracelet/lipgloss"
+	"charm.land/bubbles/v2/key"
+	tea "charm.land/bubbletea/v2"
+	"charm.land/lipgloss/v2"
+	uv "github.com/charmbracelet/ultraviolet"
 	"github.com/vividcode-ai/vividcode/internal/tui/theme"
 )
 
@@ -18,6 +19,8 @@ type SplitPaneLayout interface {
 	ClearLeftPanel() tea.Cmd
 	ClearRightPanel() tea.Cmd
 	ClearBottomPanel() tea.Cmd
+
+	Draw(scr uv.Screen, area uv.Rectangle) *tea.Cursor
 }
 
 type splitPaneLayout struct {
@@ -85,17 +88,17 @@ func (s *splitPaneLayout) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	return s, tea.Batch(cmds...)
 }
 
-func (s *splitPaneLayout) View() string {
+func (s *splitPaneLayout) View() tea.View {
 	var topSection string
 
 	if s.leftPanel != nil && s.rightPanel != nil {
 		leftView := s.leftPanel.View()
 		rightView := s.rightPanel.View()
-		topSection = lipgloss.JoinHorizontal(lipgloss.Top, leftView, rightView)
+		topSection = lipgloss.JoinHorizontal(lipgloss.Top, leftView.Content, rightView.Content)
 	} else if s.leftPanel != nil {
-		topSection = s.leftPanel.View()
+		topSection = s.leftPanel.View().Content
 	} else if s.rightPanel != nil {
-		topSection = s.rightPanel.View()
+		topSection = s.rightPanel.View().Content
 	} else {
 		topSection = ""
 	}
@@ -104,9 +107,9 @@ func (s *splitPaneLayout) View() string {
 
 	if s.bottomPanel != nil && topSection != "" {
 		bottomView := s.bottomPanel.View()
-		finalView = lipgloss.JoinVertical(lipgloss.Left, topSection, bottomView)
+		finalView = lipgloss.JoinVertical(lipgloss.Left, topSection, bottomView.Content)
 	} else if s.bottomPanel != nil {
-		finalView = s.bottomPanel.View()
+		finalView = s.bottomPanel.View().Content
 	} else {
 		finalView = topSection
 	}
@@ -117,12 +120,12 @@ func (s *splitPaneLayout) View() string {
 		style := lipgloss.NewStyle().
 			Width(s.width).
 			Height(s.height).
-			Background(t.Background())
+			Background(lipgloss.Color(t.Background()))
 
-		return style.Render(finalView)
+		return tea.View{Content: style.Render(finalView)}
 	}
 
-	return finalView
+	return tea.View{Content: finalView}
 }
 
 func (s *splitPaneLayout) SetSize(width, height int) tea.Cmd {
@@ -240,10 +243,16 @@ func (s *splitPaneLayout) BindingKeys() []key.Binding {
 	return keys
 }
 
+func (s *splitPaneLayout) Draw(scr uv.Screen, area uv.Rectangle) *tea.Cursor {
+	view := s.View().Content
+	uv.NewStyledString(view).Draw(scr, area)
+	return nil
+}
+
 func NewSplitPane(options ...SplitPaneOption) SplitPaneLayout {
 
 	layout := &splitPaneLayout{
-		ratio:         0.7,
+		ratio:         0.8,
 		verticalRatio: 0.9, // Default 90% for top section, 10% for bottom
 	}
 	for _, option := range options {

@@ -1,11 +1,13 @@
 package dialog
 
 import (
-	"github.com/charmbracelet/bubbles/key"
-	tea "github.com/charmbracelet/bubbletea"
-	"github.com/charmbracelet/lipgloss"
+	"charm.land/bubbles/v2/key"
+	tea "charm.land/bubbletea/v2"
+	"charm.land/lipgloss/v2"
+	uv "github.com/charmbracelet/ultraviolet"
 	utilComponents "github.com/vividcode-ai/vividcode/internal/tui/components/util"
 	"github.com/vividcode-ai/vividcode/internal/tui/layout"
+	"github.com/vividcode-ai/vividcode/internal/tui/render"
 	"github.com/vividcode-ai/vividcode/internal/tui/styles"
 	"github.com/vividcode-ai/vividcode/internal/tui/theme"
 	"github.com/vividcode-ai/vividcode/internal/tui/util"
@@ -23,19 +25,19 @@ func (ci Command) Render(selected bool, width int) string {
 	t := theme.CurrentTheme()
 	baseStyle := styles.BaseStyle()
 
-	descStyle := baseStyle.Width(width).Foreground(t.TextMuted())
+	descStyle := baseStyle.Width(width).Foreground(lipgloss.Color(t.TextMuted()))
 	itemStyle := baseStyle.Width(width).
-		Foreground(t.Text()).
-		Background(t.Background())
+		Foreground(lipgloss.Color(t.Text())).
+		Background(lipgloss.Color(t.Background()))
 
 	if selected {
 		itemStyle = itemStyle.
-			Background(t.Primary()).
-			Foreground(t.Background()).
+			Background(lipgloss.Color(t.Primary())).
+			Foreground(lipgloss.Color(t.Background())).
 			Bold(true)
 		descStyle = descStyle.
-			Background(t.Primary()).
-			Foreground(t.Background())
+			Background(lipgloss.Color(t.Primary())).
+			Foreground(lipgloss.Color(t.Background()))
 	}
 
 	title := itemStyle.Padding(0, 1).Render(ci.Title)
@@ -59,6 +61,7 @@ type CommandDialog interface {
 	tea.Model
 	layout.Bindings
 	SetCommands(commands []Command)
+	Draw(scr uv.Screen, area uv.Rectangle) *tea.Cursor
 }
 
 type commandDialogCmp struct {
@@ -114,7 +117,7 @@ func (c *commandDialogCmp) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	return c, tea.Batch(cmds...)
 }
 
-func (c *commandDialogCmp) View() string {
+func (c *commandDialogCmp) View() tea.View {
 	t := theme.CurrentTheme()
 	baseStyle := styles.BaseStyle()
 
@@ -136,7 +139,7 @@ func (c *commandDialogCmp) View() string {
 	c.listView.SetMaxWidth(maxWidth)
 
 	title := baseStyle.
-		Foreground(t.Primary()).
+		Foreground(lipgloss.Color(t.Primary())).
 		Bold(true).
 		Width(maxWidth).
 		Padding(0, 1).
@@ -146,16 +149,22 @@ func (c *commandDialogCmp) View() string {
 		lipgloss.Left,
 		title,
 		baseStyle.Width(maxWidth).Render(""),
-		baseStyle.Width(maxWidth).Render(c.listView.View()),
+		baseStyle.Width(maxWidth).Render(c.listView.View().Content),
 		baseStyle.Width(maxWidth).Render(""),
 	)
 
-	return baseStyle.Padding(1, 2).
+	return tea.View{Content: baseStyle.Padding(1, 2).
 		Border(lipgloss.RoundedBorder()).
-		BorderBackground(t.Background()).
-		BorderForeground(t.TextMuted()).
+		BorderBackground(lipgloss.Color(t.Background())).
+		BorderForeground(lipgloss.Color(t.TextMuted())).
 		Width(lipgloss.Width(content) + 4).
-		Render(content)
+		Render(content)}
+}
+
+func (c *commandDialogCmp) Draw(scr uv.Screen, area uv.Rectangle) *tea.Cursor {
+	view := c.View().Content
+	render.DrawCenter(scr, area, view)
+	return nil
 }
 
 func (c *commandDialogCmp) BindingKeys() []key.Binding {

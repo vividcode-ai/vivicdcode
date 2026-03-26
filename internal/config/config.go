@@ -261,9 +261,6 @@ func setProviderDefaults() {
 	if apiKey := os.Getenv("OPENAI_API_KEY"); apiKey != "" {
 		viper.SetDefault("providers.openai.apiKey", apiKey)
 	}
-	if apiKey := os.Getenv("GEMINI_API_KEY"); apiKey != "" {
-		viper.SetDefault("providers.gemini.apiKey", apiKey)
-	}
 	if apiKey := os.Getenv("GROQ_API_KEY"); apiKey != "" {
 		viper.SetDefault("providers.groq.apiKey", apiKey)
 	}
@@ -325,15 +322,6 @@ func setProviderDefaults() {
 		return
 	}
 
-	// Google Gemini configuration
-	if key := viper.GetString("providers.gemini.apiKey"); strings.TrimSpace(key) != "" {
-		viper.SetDefault("agents.coder.model", models.Gemini25)
-		viper.SetDefault("agents.summarizer.model", models.Gemini25)
-		viper.SetDefault("agents.task.model", models.Gemini25Flash)
-		viper.SetDefault("agents.title.model", models.Gemini25Flash)
-		return
-	}
-
 	// Groq configuration
 	if key := viper.GetString("providers.groq.apiKey"); strings.TrimSpace(key) != "" {
 		viper.SetDefault("agents.coder.model", models.QWENQwq)
@@ -385,15 +373,6 @@ func setProviderDefaults() {
 		viper.SetDefault("agents.summarizer.model", models.AzureGPT41)
 		viper.SetDefault("agents.task.model", models.AzureGPT41Mini)
 		viper.SetDefault("agents.title.model", models.AzureGPT41Mini)
-		return
-	}
-
-	// Google Cloud VertexAI configuration
-	if hasVertexAICredentials() {
-		viper.SetDefault("agents.coder.model", models.VertexAIGemini25)
-		viper.SetDefault("agents.summarizer.model", models.VertexAIGemini25)
-		viper.SetDefault("agents.task.model", models.VertexAIGemini25Flash)
-		viper.SetDefault("agents.title.model", models.VertexAIGemini25Flash)
 		return
 	}
 }
@@ -659,8 +638,6 @@ func getProviderAPIKey(provider models.ModelProvider) string {
 		return os.Getenv("ANTHROPIC_API_KEY")
 	case models.ProviderOpenAI:
 		return os.Getenv("OPENAI_API_KEY")
-	case models.ProviderGemini:
-		return os.Getenv("GEMINI_API_KEY")
 	case models.ProviderGROQ:
 		return os.Getenv("GROQ_API_KEY")
 	case models.ProviderAzure:
@@ -670,10 +647,6 @@ func getProviderAPIKey(provider models.ModelProvider) string {
 	case models.ProviderBedrock:
 		if hasAWSCredentials() {
 			return "aws-credentials-available"
-		}
-	case models.ProviderVertexAI:
-		if hasVertexAICredentials() {
-			return "vertex-ai-credentials-available"
 		}
 	case models.ProviderMiniMax:
 		return os.Getenv("MINIMAX_API_KEY")
@@ -764,24 +737,6 @@ func setDefaultModelForAgent(agent AgentName) bool {
 		return true
 	}
 
-	if apiKey := os.Getenv("GEMINI_API_KEY"); apiKey != "" {
-		var model models.ModelID
-		maxTokens := int64(5000)
-
-		if agent == AgentTitle {
-			model = models.Gemini25Flash
-			maxTokens = 80
-		} else {
-			model = models.Gemini25
-		}
-
-		cfg.Agents[agent] = Agent{
-			Model:     model,
-			MaxTokens: maxTokens,
-		}
-		return true
-	}
-
 	if apiKey := os.Getenv("GROQ_API_KEY"); apiKey != "" {
 		maxTokens := int64(5000)
 		if agent == AgentTitle {
@@ -805,24 +760,6 @@ func setDefaultModelForAgent(agent AgentName) bool {
 			Model:           models.BedrockClaude37Sonnet,
 			MaxTokens:       maxTokens,
 			ReasoningEffort: "medium", // Claude models support reasoning
-		}
-		return true
-	}
-
-	if hasVertexAICredentials() {
-		var model models.ModelID
-		maxTokens := int64(5000)
-
-		if agent == AgentTitle {
-			model = models.VertexAIGemini25Flash
-			maxTokens = 80
-		} else {
-			model = models.VertexAIGemini25
-		}
-
-		cfg.Agents[agent] = Agent{
-			Model:     model,
-			MaxTokens: maxTokens,
 		}
 		return true
 	}

@@ -4,9 +4,10 @@ import (
 	"encoding/json"
 	"slices"
 
-	"github.com/charmbracelet/bubbles/key"
-	"github.com/charmbracelet/bubbles/table"
-	tea "github.com/charmbracelet/bubbletea"
+	"charm.land/bubbles/v2/key"
+	"charm.land/bubbles/v2/table"
+	tea "charm.land/bubbletea/v2"
+	"charm.land/lipgloss/v2"
 	"github.com/vividcode-ai/vividcode/internal/logging"
 	"github.com/vividcode-ai/vividcode/internal/pubsub"
 	"github.com/vividcode-ai/vividcode/internal/tui/layout"
@@ -61,12 +62,12 @@ func (i *tableCmp) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	return i, tea.Batch(cmds...)
 }
 
-func (i *tableCmp) View() string {
+func (i *tableCmp) View() tea.View {
 	t := theme.CurrentTheme()
 	defaultStyles := table.DefaultStyles()
-	defaultStyles.Selected = defaultStyles.Selected.Foreground(t.Primary())
+	defaultStyles.Selected = defaultStyles.Selected.Foreground(lipgloss.Color(t.Primary()))
 	i.table.SetStyles(defaultStyles)
-	return styles.ForceReplaceBackgroundWithLipgloss(i.table.View(), t.Background())
+	return tea.View{Content: styles.ForceReplaceBackgroundWithLipgloss(i.table.View(), lipgloss.Color(t.Background()))}
 }
 
 func (i *tableCmp) GetSize() (int, int) {

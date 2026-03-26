@@ -1,9 +1,10 @@
 package page
 
 import (
-	"github.com/charmbracelet/bubbles/key"
-	tea "github.com/charmbracelet/bubbletea"
-	"github.com/charmbracelet/lipgloss"
+	"charm.land/bubbles/v2/key"
+	tea "charm.land/bubbletea/v2"
+	"charm.land/lipgloss/v2"
+	uv "github.com/charmbracelet/ultraviolet"
 	"github.com/vividcode-ai/vividcode/internal/tui/components/logs"
 	"github.com/vividcode-ai/vividcode/internal/tui/layout"
 	"github.com/vividcode-ai/vividcode/internal/tui/styles"
@@ -41,16 +42,22 @@ func (p *logsPage) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	return p, tea.Batch(cmds...)
 }
 
-func (p *logsPage) View() string {
+func (p *logsPage) View() tea.View {
 	style := styles.BaseStyle().Width(p.width).Height(p.height)
-	return style.Render(lipgloss.JoinVertical(lipgloss.Top,
-		p.table.View(),
-		p.details.View(),
-	))
+	return tea.View{Content: style.Render(lipgloss.JoinVertical(lipgloss.Top,
+		p.table.View().Content,
+		p.details.View().Content,
+	))}
 }
 
 func (p *logsPage) BindingKeys() []key.Binding {
 	return p.table.BindingKeys()
+}
+
+func (p *logsPage) Draw(scr uv.Screen, area uv.Rectangle) *tea.Cursor {
+	view := p.View().Content
+	uv.NewStyledString(view).Draw(scr, area)
+	return nil
 }
 
 // GetSize implements LogPage.

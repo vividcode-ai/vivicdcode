@@ -66,7 +66,6 @@ type providerClientOptions struct {
 
 	anthropicOptions []AnthropicOption
 	openaiOptions    []OpenAIOption
-	geminiOptions    []GeminiOption
 	bedrockOptions   []BedrockOption
 	copilotOptions   []CopilotOption
 }
@@ -104,11 +103,6 @@ func NewProvider(providerName models.ModelProvider, opts ...ProviderClientOption
 			options: clientOptions,
 			client:  newOpenAIClient(clientOptions),
 		}, nil
-	case models.ProviderGemini:
-		return &baseProvider[GeminiClient]{
-			options: clientOptions,
-			client:  newGeminiClient(clientOptions),
-		}, nil
 	case models.ProviderBedrock:
 		return &baseProvider[BedrockClient]{
 			options: clientOptions,
@@ -126,11 +120,6 @@ func NewProvider(providerName models.ModelProvider, opts ...ProviderClientOption
 		return &baseProvider[AzureClient]{
 			options: clientOptions,
 			client:  newAzureClient(clientOptions),
-		}, nil
-	case models.ProviderVertexAI:
-		return &baseProvider[VertexAIClient]{
-			options: clientOptions,
-			client:  newVertexAIClient(clientOptions),
 		}, nil
 	case models.ProviderOpenRouter:
 		clientOptions.openaiOptions = append(clientOptions.openaiOptions,
@@ -241,12 +230,6 @@ func WithAnthropicOptions(anthropicOptions ...AnthropicOption) ProviderClientOpt
 func WithOpenAIOptions(openaiOptions ...OpenAIOption) ProviderClientOption {
 	return func(options *providerClientOptions) {
 		options.openaiOptions = openaiOptions
-	}
-}
-
-func WithGeminiOptions(geminiOptions ...GeminiOption) ProviderClientOption {
-	return func(options *providerClientOptions) {
-		options.geminiOptions = geminiOptions
 	}
 }
 

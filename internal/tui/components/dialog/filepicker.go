@@ -9,16 +9,18 @@ import (
 	"strings"
 	"time"
 
-	"github.com/charmbracelet/bubbles/key"
-	"github.com/charmbracelet/bubbles/textinput"
-	"github.com/charmbracelet/bubbles/viewport"
-	tea "github.com/charmbracelet/bubbletea"
-	"github.com/charmbracelet/lipgloss"
+	"charm.land/bubbles/v2/key"
+	"charm.land/bubbles/v2/textinput"
+	"charm.land/bubbles/v2/viewport"
+	tea "charm.land/bubbletea/v2"
+	"charm.land/lipgloss/v2"
+	uv "github.com/charmbracelet/ultraviolet"
 	"github.com/vividcode-ai/vividcode/internal/app"
 	"github.com/vividcode-ai/vividcode/internal/config"
 	"github.com/vividcode-ai/vividcode/internal/logging"
 	"github.com/vividcode-ai/vividcode/internal/message"
 	"github.com/vividcode-ai/vividcode/internal/tui/image"
+	"github.com/vividcode-ai/vividcode/internal/tui/render"
 	"github.com/vividcode-ai/vividcode/internal/tui/styles"
 	"github.com/vividcode-ai/vividcode/internal/tui/theme"
 	"github.com/vividcode-ai/vividcode/internal/tui/util"
@@ -122,8 +124,8 @@ func (f *filepickerCmp) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case tea.WindowSizeMsg:
 		f.width = 60
 		f.height = 20
-		f.viewport.Width = 80
-		f.viewport.Height = 22
+		f.viewport.SetWidth(80)
+		f.viewport.SetHeight(22)
 		f.cursor = 0
 		f.getCurrentFileBelowCursor()
 	case tea.KeyMsg:
@@ -258,7 +260,7 @@ func (f *filepickerCmp) addAttachmentToMessage() (tea.Model, tea.Cmd) {
 	return f, util.CmdHandler(AttachmentAddedMsg{attachment})
 }
 
-func (f *filepickerCmp) View() string {
+func (f *filepickerCmp) View() tea.View {
 	t := theme.CurrentTheme()
 	const maxVisibleDirs = 20
 	const maxWidth = 80
@@ -291,8 +293,8 @@ func (f *filepickerCmp) View() string {
 
 		if i == f.cursor {
 			itemStyle = itemStyle.
-				Background(t.Primary()).
-				Foreground(t.Background()).
+				Background(lipgloss.Color(t.Primary())).
+				Foreground(lipgloss.Color(t.Background())).
 				Bold(true)
 		}
 		filename := file.Name()
@@ -319,11 +321,11 @@ func (f *filepickerCmp) View() string {
 		Render(f.cwd.View())
 
 	viewportstyle := lipgloss.NewStyle().
-		Width(f.viewport.Width).
-		Background(t.Background()).
+		Width(f.viewport.Width()).
+		Background(lipgloss.Color(t.Background())).
 		Border(lipgloss.RoundedBorder()).
-		BorderForeground(t.TextMuted()).
-		BorderBackground(t.Background()).
+		BorderForeground(lipgloss.Color(t.TextMuted())).
+		BorderBackground(lipgloss.Color(t.Background())).
 		Padding(2).
 		Render(f.viewport.View())
 	var insertExitText string
@@ -339,23 +341,30 @@ func (f *filepickerCmp) View() string {
 		styles.BaseStyle().Width(adjustedWidth).Render(""),
 		styles.BaseStyle().Width(adjustedWidth).Render(lipgloss.JoinVertical(lipgloss.Left, files...)),
 		styles.BaseStyle().Width(adjustedWidth).Render(""),
-		styles.BaseStyle().Foreground(t.TextMuted()).Width(adjustedWidth).Render(insertExitText),
+		styles.BaseStyle().Foreground(lipgloss.Color(t.TextMuted())).Width(adjustedWidth).Render(insertExitText),
 	)
 
 	f.cwd.SetValue(f.cwd.Value())
 	contentStyle := styles.BaseStyle().Padding(1, 2).
 		Border(lipgloss.RoundedBorder()).
-		BorderBackground(t.Background()).
-		BorderForeground(t.TextMuted()).
+		BorderBackground(lipgloss.Color(t.Background())).
+		BorderForeground(lipgloss.Color(t.TextMuted())).
 		Width(lipgloss.Width(content) + 4)
 
-	return lipgloss.JoinHorizontal(lipgloss.Center, contentStyle.Render(content), viewportstyle)
+	return tea.View{Content: lipgloss.JoinHorizontal(lipgloss.Center, contentStyle.Render(content), viewportstyle)}
+}
+
+func (f *filepickerCmp) Draw(scr uv.Screen, area uv.Rectangle) *tea.Cursor {
+	view := f.View().Content
+	render.DrawCenter(scr, area, view)
+	return nil
 }
 
 type FilepickerCmp interface {
 	tea.Model
 	ToggleFilepicker(showFilepicker bool)
 	IsCWDFocused() bool
+	Draw(scr uv.Screen, area uv.Rectangle) *tea.Cursor
 }
 
 func (f *filepickerCmp) ToggleFilepicker(showFilepicker bool) {
@@ -367,20 +376,48 @@ func (f *filepickerCmp) IsCWDFocused() bool {
 }
 
 func NewFilepickerCmp(app *app.App) FilepickerCmp {
+	fmt.Fprintf(os.Stderr, "DEBUG NewFilepickerCmp: 1. Getting home dir...\n")
+	fflush()
 	homepath, err := os.UserHomeDir()
 	if err != nil {
 		logging.Error("error loading user files")
 		return nil
 	}
+	fmt.Fprintf(os.Stderr, "DEBUG NewFilepickerCmp: 2. Creating baseDir...\n")
+	fflush()
 	baseDir := DirNode{parent: nil, directory: homepath}
+	fmt.Fprintf(os.Stderr, "DEBUG NewFilepickerCmp: 3. Reading dir...\n")
+	fflush()
 	dirs := readDir(homepath, false)
-	viewport := viewport.New(0, 0)
+	fmt.Fprintf(os.Stderr, "DEBUG NewFilepickerCmp: 4. Creating viewport...\n")
+	fflush()
+	viewport := viewport.New(viewport.WithWidth(0), viewport.WithHeight(0))
+	fmt.Fprintf(os.Stderr, "DEBUG NewFilepickerCmp: 4b. Viewport created\n")
+	fflush()
+	fmt.Fprintf(os.Stderr, "DEBUG NewFilepickerCmp: 5. Creating textinput...\n")
+	fflush()
 	currentDirectory := textinput.New()
+	fmt.Fprintf(os.Stderr, "DEBUG NewFilepickerCmp: 5b. Textinput created\n")
+	fflush()
+	fmt.Fprintf(os.Stderr, "DEBUG NewFilepickerCmp: 5c. Setting char limit...\n")
+	fflush()
 	currentDirectory.CharLimit = 200
-	currentDirectory.Width = 44
-	currentDirectory.Cursor.Blink = true
+	fmt.Fprintf(os.Stderr, "DEBUG NewFilepickerCmp: 5d. Setting width...\n")
+	fflush()
+	currentDirectory.SetWidth(44)
+	fmt.Fprintf(os.Stderr, "DEBUG NewFilepickerCmp: 5e. Setting value...\n")
+	fflush()
 	currentDirectory.SetValue(baseDir.directory)
-	return &filepickerCmp{cwdDetails: &baseDir, dirs: dirs, cursorChain: make(stack, 0), viewport: viewport, cwd: currentDirectory, app: app}
+	fmt.Fprintf(os.Stderr, "DEBUG NewFilepickerCmp: 6. Creating stack...\n")
+	fflush()
+	stack := make(stack, 0)
+	fmt.Fprintf(os.Stderr, "DEBUG NewFilepickerCmp: 7. Creating filepickerCmp...\n")
+	fflush()
+	return &filepickerCmp{cwdDetails: &baseDir, dirs: dirs, cursorChain: stack, viewport: viewport, cwd: currentDirectory, app: app}
+}
+
+func fflush() {
+	os.Stderr.Write([]byte{})
 }
 
 func (f *filepickerCmp) getCurrentFileBelowCursor() {
@@ -396,7 +433,7 @@ func (f *filepickerCmp) getCurrentFileBelowCursor() {
 		fullPath := f.cwdDetails.directory + "/" + dir.Name()
 
 		go func() {
-			imageString, err := image.ImagePreview(f.viewport.Width-4, fullPath)
+			imageString, err := image.ImagePreview(f.viewport.Width()-4, fullPath)
 			if err != nil {
 				logging.Error(err.Error())
 				f.viewport.SetContent("Preview unavailable")

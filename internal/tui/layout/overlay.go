@@ -3,7 +3,7 @@ package layout
 import (
 	"strings"
 
-	"github.com/charmbracelet/lipgloss"
+	"charm.land/lipgloss/v2"
 	chAnsi "github.com/charmbracelet/x/ansi"
 	"github.com/muesli/ansi"
 	"github.com/muesli/reflow/truncate"
@@ -49,8 +49,8 @@ func PlaceOverlay(
 
 		var shadowbg string = ""
 		shadowchar := lipgloss.NewStyle().
-			Background(t.BackgroundDarker()).
-			Foreground(t.Background()).
+			Background(lipgloss.Color(t.BackgroundDarker())).
+			Foreground(lipgloss.Color(t.Background())).
 			Render("░")
 		bgchar := baseStyle.Render(" ")
 		for i := 0; i <= fgHeight; i++ {

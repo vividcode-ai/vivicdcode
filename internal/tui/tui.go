@@ -3,11 +3,16 @@ package tui
 import (
 	"context"
 	"fmt"
+	"image"
+	"math/rand"
+	"os"
 	"strings"
 
-	"github.com/charmbracelet/bubbles/key"
-	tea "github.com/charmbracelet/bubbletea"
-	"github.com/charmbracelet/lipgloss"
+	"charm.land/bubbles/v2/key"
+	tea "charm.land/bubbletea/v2"
+	uv "github.com/charmbracelet/ultraviolet"
+	uvlayout "github.com/charmbracelet/ultraviolet/layout"
+	"github.com/charmbracelet/ultraviolet/screen"
 	"github.com/vividcode-ai/vividcode/internal/app"
 	"github.com/vividcode-ai/vividcode/internal/config"
 	"github.com/vividcode-ai/vividcode/internal/llm/agent"
@@ -20,7 +25,7 @@ import (
 	"github.com/vividcode-ai/vividcode/internal/tui/components/dialog"
 	"github.com/vividcode-ai/vividcode/internal/tui/layout"
 	"github.com/vividcode-ai/vividcode/internal/tui/page"
-	"github.com/vividcode-ai/vividcode/internal/tui/theme"
+	"github.com/vividcode-ai/vividcode/internal/tui/render"
 	"github.com/vividcode-ai/vividcode/internal/tui/util"
 )
 
@@ -95,6 +100,14 @@ var logsKeyReturnKey = key.NewBinding(
 	key.WithHelp("esc/q", "go back"),
 )
 
+type uiLayout struct {
+	area   uv.Rectangle
+	main   uv.Rectangle
+	editor uv.Rectangle
+	status uv.Rectangle
+	dialog uv.Rectangle
+}
+
 type appModel struct {
 	width, height   int
 	currentPage     page.PageID
@@ -138,6 +151,17 @@ type appModel struct {
 
 	isCompacting      bool
 	compactingMessage string
+
+	layout uiLayout
+
+	focusedComponent string
+
+	dialog *render.Overlay
+
+	sendProgressBar    bool
+	progressBarEnabled bool
+
+	notifyWindowFocused bool
 }
 
 func (a appModel) Init() tea.Cmd {
@@ -222,6 +246,21 @@ func (a appModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		}
 
 		return a, tea.Batch(cmds...)
+	case tea.FocusMsg:
+		a.notifyWindowFocused = true
+	case tea.BlurMsg:
+		a.notifyWindowFocused = false
+	case tea.MouseClickMsg:
+		cmds = append(cmds, func() tea.Msg { return msg })
+	case tea.MouseMotionMsg:
+		if render.MouseEventFilter(a, msg) == nil {
+			return a, nil
+		}
+	case tea.MouseWheelMsg:
+		if render.MouseEventFilter(a, msg) == nil {
+			return a, nil
+		}
+
 	// Status
 	case util.InfoMsg:
 		s, cmd := a.status.Update(msg)
@@ -699,227 +738,178 @@ func (a *appModel) moveToPage(pageID page.PageID) tea.Cmd {
 	return tea.Batch(cmds...)
 }
 
-func (a appModel) View() string {
-	components := []string{
-		a.pages[a.currentPage].View(),
+func (a appModel) generateLayout(w, h int) uiLayout {
+	area := image.Rect(0, 0, w, h)
+
+	editorHeight := 5
+	statusHeight := 1
+
+	appRect, statusRect := uvlayout.SplitVertical(area, uvlayout.Fixed(statusHeight))
+
+	mainRect, editorRect := uvlayout.SplitVertical(appRect, uvlayout.Fixed(editorHeight))
+
+	mainRect.Min.Y += 1
+	mainRect.Max.Y -= 1
+	mainRect.Min.X += 1
+	mainRect.Max.X -= 1
+
+	editorRect.Min.X += 1
+	editorRect.Max.X -= 1
+
+	return uiLayout{
+		area:   area,
+		main:   mainRect,
+		editor: editorRect,
+		status: statusRect,
+	}
+}
+
+func (a *appModel) updateSize() {
+	a.status.SetWidth(a.layout.status.Dx())
+
+	if sizable, ok := a.pages[a.currentPage].(layout.Sizeable); ok {
+		sizable.SetSize(a.layout.main.Dx(), a.layout.main.Dy())
+	}
+}
+
+func (a appModel) Draw(scr uv.Screen, area uv.Rectangle) *tea.Cursor {
+	uiLayout := a.generateLayout(area.Dx(), area.Dy())
+
+	if a.layout != uiLayout {
+		a.layout = uiLayout
+		a.updateSize()
 	}
 
-	components = append(components, a.status.View())
+	screen.Clear(scr)
 
-	appView := lipgloss.JoinVertical(lipgloss.Top, components...)
+	mainContent := a.pages[a.currentPage].View().Content
+	uv.NewStyledString(mainContent).Draw(scr, a.layout.main)
 
-	if a.showPermissions {
-		overlay := a.permissions.View()
-		row := lipgloss.Height(appView) / 2
-		row -= lipgloss.Height(overlay) / 2
-		col := lipgloss.Width(appView) / 2
-		col -= lipgloss.Width(overlay) / 2
-		appView = layout.PlaceOverlay(
-			col,
-			row,
-			overlay,
-			appView,
-			true,
-		)
-	}
-
-	if a.showFilepicker {
-		overlay := a.filepicker.View()
-		row := lipgloss.Height(appView) / 2
-		row -= lipgloss.Height(overlay) / 2
-		col := lipgloss.Width(appView) / 2
-		col -= lipgloss.Width(overlay) / 2
-		appView = layout.PlaceOverlay(
-			col,
-			row,
-			overlay,
-			appView,
-			true,
-		)
-
-	}
-
-	// Show compacting status overlay
-	if a.isCompacting {
-		t := theme.CurrentTheme()
-		style := lipgloss.NewStyle().
-			Border(lipgloss.RoundedBorder()).
-			BorderForeground(t.BorderFocused()).
-			BorderBackground(t.Background()).
-			Padding(1, 2).
-			Background(t.Background()).
-			Foreground(t.Text())
-
-		overlay := style.Render("Summarizing\n" + a.compactingMessage)
-		row := lipgloss.Height(appView) / 2
-		row -= lipgloss.Height(overlay) / 2
-		col := lipgloss.Width(appView) / 2
-		col -= lipgloss.Width(overlay) / 2
-		appView = layout.PlaceOverlay(
-			col,
-			row,
-			overlay,
-			appView,
-			true,
-		)
-	}
+	statusContent := a.status.View().Content
+	uv.NewStyledString(statusContent).Draw(scr, a.layout.status)
 
 	if a.showHelp {
-		bindings := layout.KeyMapToSlice(keys)
-		if p, ok := a.pages[a.currentPage].(layout.Bindings); ok {
-			bindings = append(bindings, p.BindingKeys()...)
-		}
-		if a.showPermissions {
-			bindings = append(bindings, a.permissions.BindingKeys()...)
-		}
-		if a.currentPage == page.LogsPage {
-			bindings = append(bindings, logsKeyReturnKey)
-		}
-		if !a.app.CoderAgent.IsBusy() {
-			bindings = append(bindings, helpEsc)
-		}
-		a.help.SetBindings(bindings)
-
-		overlay := a.help.View()
-		row := lipgloss.Height(appView) / 2
-		row -= lipgloss.Height(overlay) / 2
-		col := lipgloss.Width(appView) / 2
-		col -= lipgloss.Width(overlay) / 2
-		appView = layout.PlaceOverlay(
-			col,
-			row,
-			overlay,
-			appView,
-			true,
-		)
+		a.help.Draw(scr, area)
 	}
-
 	if a.showQuit {
-		overlay := a.quit.View()
-		row := lipgloss.Height(appView) / 2
-		row -= lipgloss.Height(overlay) / 2
-		col := lipgloss.Width(appView) / 2
-		col -= lipgloss.Width(overlay) / 2
-		appView = layout.PlaceOverlay(
-			col,
-			row,
-			overlay,
-			appView,
-			true,
-		)
+		a.quit.Draw(scr, area)
 	}
-
 	if a.showSessionDialog {
-		overlay := a.sessionDialog.View()
-		row := lipgloss.Height(appView) / 2
-		row -= lipgloss.Height(overlay) / 2
-		col := lipgloss.Width(appView) / 2
-		col -= lipgloss.Width(overlay) / 2
-		appView = layout.PlaceOverlay(
-			col,
-			row,
-			overlay,
-			appView,
-			true,
-		)
+		a.sessionDialog.Draw(scr, area)
 	}
-
-	if a.showModelDialog {
-		overlay := a.modelDialog.View()
-		row := lipgloss.Height(appView) / 2
-		row -= lipgloss.Height(overlay) / 2
-		col := lipgloss.Width(appView) / 2
-		col -= lipgloss.Width(overlay) / 2
-		appView = layout.PlaceOverlay(
-			col,
-			row,
-			overlay,
-			appView,
-			true,
-		)
-	}
-
 	if a.showCommandDialog {
-		overlay := a.commandDialog.View()
-		row := lipgloss.Height(appView) / 2
-		row -= lipgloss.Height(overlay) / 2
-		col := lipgloss.Width(appView) / 2
-		col -= lipgloss.Width(overlay) / 2
-		appView = layout.PlaceOverlay(
-			col,
-			row,
-			overlay,
-			appView,
-			true,
-		)
+		a.commandDialog.Draw(scr, area)
 	}
-
+	if a.showModelDialog {
+		a.modelDialog.Draw(scr, area)
+	}
 	if a.showInitDialog {
-		overlay := a.initDialog.View()
-		appView = layout.PlaceOverlay(
-			a.width/2-lipgloss.Width(overlay)/2,
-			a.height/2-lipgloss.Height(overlay)/2,
-			overlay,
-			appView,
-			true,
-		)
+		a.initDialog.Draw(scr, area)
 	}
-
 	if a.showThemeDialog {
-		overlay := a.themeDialog.View()
-		row := lipgloss.Height(appView) / 2
-		row -= lipgloss.Height(overlay) / 2
-		col := lipgloss.Width(appView) / 2
-		col -= lipgloss.Width(overlay) / 2
-		appView = layout.PlaceOverlay(
-			col,
-			row,
-			overlay,
-			appView,
-			true,
-		)
+		a.themeDialog.Draw(scr, area)
 	}
-
+	if a.showPermissions {
+		a.permissions.Draw(scr, area)
+	}
+	if a.showFilepicker {
+		a.filepicker.Draw(scr, area)
+	}
 	if a.showMultiArgumentsDialog {
-		overlay := a.multiArgumentsDialog.View()
-		row := lipgloss.Height(appView) / 2
-		row -= lipgloss.Height(overlay) / 2
-		col := lipgloss.Width(appView) / 2
-		col -= lipgloss.Width(overlay) / 2
-		appView = layout.PlaceOverlay(
-			col,
-			row,
-			overlay,
-			appView,
-			true,
-		)
+		a.multiArgumentsDialog.Draw(scr, area)
 	}
 
-	return appView
+	return nil
+}
+
+func (a appModel) View() tea.View {
+	var v tea.View
+	v.AltScreen = true
+	v.MouseMode = tea.MouseModeCellMotion
+	v.ReportFocus = true
+
+	width := a.width
+	height := a.height
+	if width <= 0 {
+		width = 80
+	}
+	if height <= 0 {
+		height = 24
+	}
+
+	canvas := uv.NewScreenBuffer(width, height)
+	v.Cursor = a.Draw(canvas, canvas.Bounds())
+
+	content := strings.ReplaceAll(canvas.Render(), "\r\n", "\n")
+	contentLines := strings.Split(content, "\n")
+	for i, line := range contentLines {
+		contentLines[i] = strings.TrimRight(line, " ")
+	}
+	content = strings.Join(contentLines, "\n")
+
+	v.Content = content
+
+	if a.progressBarEnabled && a.sendProgressBar && a.app.CoderAgent.IsBusy() {
+		v.ProgressBar = tea.NewProgressBar(tea.ProgressBarIndeterminate, rand.Intn(100))
+	}
+
+	return v
 }
 
 func New(app *app.App) tea.Model {
 	startPage := page.ChatPage
+	fmt.Fprintf(os.Stderr, "DEBUG New: Creating appModel...\n")
+
+	fmt.Fprintf(os.Stderr, "DEBUG New: 1. Creating status...\n")
+	status := core.NewStatusCmp(app.LSPClients)
+	fmt.Fprintf(os.Stderr, "DEBUG New: 2. Creating help...\n")
+	help := dialog.NewHelpCmp()
+	fmt.Fprintf(os.Stderr, "DEBUG New: 3. Creating quit...\n")
+	quit := dialog.NewQuitCmp()
+	fmt.Fprintf(os.Stderr, "DEBUG New: 4. Creating sessionDialog...\n")
+	sessionDialog := dialog.NewSessionDialogCmp()
+	fmt.Fprintf(os.Stderr, "DEBUG New: 5. Creating commandDialog...\n")
+	commandDialog := dialog.NewCommandDialogCmp()
+	fmt.Fprintf(os.Stderr, "DEBUG New: 6. Creating modelDialog...\n")
+	modelDialog := dialog.NewModelDialogCmp()
+	fmt.Fprintf(os.Stderr, "DEBUG New: 7. Creating permissions...\n")
+	permissions := dialog.NewPermissionDialogCmp()
+	fmt.Fprintf(os.Stderr, "DEBUG New: 8. Creating initDialog...\n")
+	initDialog := dialog.NewInitDialogCmp()
+	fmt.Fprintf(os.Stderr, "DEBUG New: 9. Creating themeDialog...\n")
+	themeDialog := dialog.NewThemeDialogCmp()
+	fmt.Fprintf(os.Stderr, "DEBUG New: 10. Creating chatPage...\n")
+	chatPage := page.NewChatPage(app)
+	fmt.Fprintf(os.Stderr, "DEBUG New: 11. Creating logsPage...\n")
+	logsPage := page.NewLogsPage()
+	fmt.Fprintf(os.Stderr, "DEBUG New: 12. Creating filepicker...\n")
+	filepicker := dialog.NewFilepickerCmp(app)
+	fmt.Fprintf(os.Stderr, "DEBUG New: 13. Creating overlay...\n")
+	overlay := render.NewOverlay()
+	fmt.Fprintf(os.Stderr, "DEBUG New: 14. Assembling model...\n")
+
 	model := &appModel{
 		currentPage:   startPage,
 		loadedPages:   make(map[page.PageID]bool),
-		status:        core.NewStatusCmp(app.LSPClients),
-		help:          dialog.NewHelpCmp(),
-		quit:          dialog.NewQuitCmp(),
-		sessionDialog: dialog.NewSessionDialogCmp(),
-		commandDialog: dialog.NewCommandDialogCmp(),
-		modelDialog:   dialog.NewModelDialogCmp(),
-		permissions:   dialog.NewPermissionDialogCmp(),
-		initDialog:    dialog.NewInitDialogCmp(),
-		themeDialog:   dialog.NewThemeDialogCmp(),
+		status:        status,
+		help:          help,
+		quit:          quit,
+		sessionDialog: sessionDialog,
+		commandDialog: commandDialog,
+		modelDialog:   modelDialog,
+		permissions:   permissions,
+		initDialog:    initDialog,
+		themeDialog:   themeDialog,
 		app:           app,
 		commands:      []dialog.Command{},
 		pages: map[page.PageID]tea.Model{
-			page.ChatPage: page.NewChatPage(app),
-			page.LogsPage: page.NewLogsPage(),
+			page.ChatPage: chatPage,
+			page.LogsPage: logsPage,
 		},
-		filepicker: dialog.NewFilepickerCmp(app),
+		filepicker: filepicker,
+		dialog:     overlay,
 	}
+	fmt.Fprintf(os.Stderr, "DEBUG New: appModel created, registering commands...\n")
 
 	model.RegisterCommand(dialog.Command{
 		ID:          "init",

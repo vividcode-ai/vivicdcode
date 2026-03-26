@@ -7,8 +7,8 @@ import (
 	"sync"
 	"time"
 
-	tea "github.com/charmbracelet/bubbletea"
-	zone "github.com/lrstanley/bubblezone"
+	tea "charm.land/bubbletea/v2"
+	"github.com/spf13/cobra"
 	"github.com/vividcode-ai/vividcode/internal/app"
 	"github.com/vividcode-ai/vividcode/internal/config"
 	"github.com/vividcode-ai/vividcode/internal/db"
@@ -18,7 +18,6 @@ import (
 	"github.com/vividcode-ai/vividcode/internal/pubsub"
 	"github.com/vividcode-ai/vividcode/internal/tui"
 	"github.com/vividcode-ai/vividcode/internal/version"
-	"github.com/spf13/cobra"
 )
 
 var rootCmd = &cobra.Command{
@@ -116,11 +115,15 @@ to assist developers in writing, debugging, and understanding code directly from
 
 		// Interactive mode
 		// Set up the TUI
-		zone.NewGlobal()
+		fmt.Fprintf(os.Stderr, "DEBUG: Creating TUI model...\n")
+		tuiModel := tui.New(app)
+		fmt.Fprintf(os.Stderr, "DEBUG: TUI model created: %+v\n", tuiModel)
+		fmt.Fprintf(os.Stderr, "DEBUG: Creating tea.Program...\n")
 		program := tea.NewProgram(
-			tui.New(app),
-			tea.WithAltScreen(),
+			tuiModel,
+			tea.WithEnvironment(os.Environ()),
 		)
+		fmt.Fprintf(os.Stderr, "DEBUG: tea.Program created\n")
 
 		// Setup the subscriptions, this will send services events to the TUI
 		ch, cancelSubs := setupSubscriptions(app, ctx)

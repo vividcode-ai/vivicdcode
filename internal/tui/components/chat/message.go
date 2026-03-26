@@ -8,7 +8,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/charmbracelet/lipgloss"
+	"charm.land/lipgloss/v2"
 	"github.com/charmbracelet/x/ansi"
 	"github.com/vividcode-ai/vividcode/internal/config"
 	"github.com/vividcode-ai/vividcode/internal/diff"
@@ -50,17 +50,17 @@ func renderMessage(msg string, isUser bool, isFocused bool, width int, info ...s
 	style := styles.BaseStyle().
 		Width(width - 1).
 		BorderLeft(true).
-		Foreground(t.TextMuted()).
-		BorderForeground(t.Primary()).
+		Foreground(lipgloss.Color(t.TextMuted())).
+		BorderForeground(lipgloss.Color(t.Primary())).
 		BorderStyle(lipgloss.ThickBorder())
 
 	if isUser {
-		style = style.BorderForeground(t.Secondary())
+		style = style.BorderForeground(lipgloss.Color(t.Secondary()))
 	}
 
 	// Apply markdown formatting and handle background color
 	parts := []string{
-		styles.ForceReplaceBackgroundWithLipgloss(toMarkdown(msg, isFocused, width), t.Background()),
+		styles.ForceReplaceBackgroundWithLipgloss(toMarkdown(msg, isFocused, width), lipgloss.Color(t.Background())),
 	}
 
 	// Remove newline at the end
@@ -84,8 +84,8 @@ func renderUserMessage(msg message.Message, isFocused bool, width int, position 
 	t := theme.CurrentTheme()
 	attachmentStyles := styles.BaseStyle().
 		MarginLeft(1).
-		Background(t.TextMuted()).
-		Foreground(t.Text())
+		Background(lipgloss.Color(t.TextMuted())).
+		Foreground(lipgloss.Color(t.Text()))
 	for _, attachment := range msg.BinaryContent() {
 		file := filepath.Base(attachment.Path)
 		var filename string
@@ -142,25 +142,25 @@ func renderAssistantMessage(
 			took := formatTimestampDiff(msg.CreatedAt, finishData.Time)
 			info = append(info, baseStyle.
 				Width(width-1).
-				Foreground(t.TextMuted()).
+				Foreground(lipgloss.Color(t.TextMuted())).
 				Render(fmt.Sprintf(" %s (%s)", models.SupportedModels[msg.Model].Name, took)),
 			)
 		case message.FinishReasonCanceled:
 			info = append(info, baseStyle.
 				Width(width-1).
-				Foreground(t.TextMuted()).
+				Foreground(lipgloss.Color(t.TextMuted())).
 				Render(fmt.Sprintf(" %s (%s)", models.SupportedModels[msg.Model].Name, "canceled")),
 			)
 		case message.FinishReasonError:
 			info = append(info, baseStyle.
 				Width(width-1).
-				Foreground(t.TextMuted()).
+				Foreground(lipgloss.Color(t.TextMuted())).
 				Render(fmt.Sprintf(" %s (%s)", models.SupportedModels[msg.Model].Name, "error")),
 			)
 		case message.FinishReasonPermissionDenied:
 			info = append(info, baseStyle.
 				Width(width-1).
-				Foreground(t.TextMuted()).
+				Foreground(lipgloss.Color(t.TextMuted())).
 				Render(fmt.Sprintf(" %s (%s)", models.SupportedModels[msg.Model].Name, "permission denied")),
 			)
 		}
@@ -170,7 +170,7 @@ func renderAssistantMessage(
 			content = "*Finished without output*"
 		}
 		if isSummary {
-			info = append(info, baseStyle.Width(width-1).Foreground(t.TextMuted()).Render(" (summary)"))
+			info = append(info, baseStyle.Width(width-1).Foreground(lipgloss.Color(t.TextMuted())).Render(" (summary)"))
 		}
 
 		content = renderMessage(content, false, true, width, info...)
@@ -447,7 +447,7 @@ func renderToolResponse(toolCall message.ToolCall, response message.ToolResult, 
 		errContent = ansi.Truncate(errContent, width-1, "...")
 		return baseStyle.
 			Width(width).
-			Foreground(t.Error()).
+			Foreground(lipgloss.Color(t.Error())).
 			Render(errContent)
 	}
 
@@ -456,13 +456,13 @@ func renderToolResponse(toolCall message.ToolCall, response message.ToolResult, 
 	case agent.AgentToolName:
 		return styles.ForceReplaceBackgroundWithLipgloss(
 			toMarkdown(resultContent, false, width),
-			t.Background(),
+			lipgloss.Color(t.Background()),
 		)
 	case tools.BashToolName:
 		resultContent = fmt.Sprintf("```bash\n%s\n```", resultContent)
 		return styles.ForceReplaceBackgroundWithLipgloss(
 			toMarkdown(resultContent, true, width),
-			t.Background(),
+			lipgloss.Color(t.Background()),
 		)
 	case tools.EditToolName:
 		metadata := tools.EditResponseMetadata{}
@@ -483,16 +483,16 @@ func renderToolResponse(toolCall message.ToolCall, response message.ToolResult, 
 		resultContent = fmt.Sprintf("```%s\n%s\n```", mdFormat, resultContent)
 		return styles.ForceReplaceBackgroundWithLipgloss(
 			toMarkdown(resultContent, true, width),
-			t.Background(),
+			lipgloss.Color(t.Background()),
 		)
 	case tools.GlobToolName:
-		return baseStyle.Width(width).Foreground(t.TextMuted()).Render(resultContent)
+		return baseStyle.Width(width).Foreground(lipgloss.Color(t.TextMuted())).Render(resultContent)
 	case tools.GrepToolName:
-		return baseStyle.Width(width).Foreground(t.TextMuted()).Render(resultContent)
+		return baseStyle.Width(width).Foreground(lipgloss.Color(t.TextMuted())).Render(resultContent)
 	case tools.LSToolName:
-		return baseStyle.Width(width).Foreground(t.TextMuted()).Render(resultContent)
+		return baseStyle.Width(width).Foreground(lipgloss.Color(t.TextMuted())).Render(resultContent)
 	case tools.SourcegraphToolName:
-		return baseStyle.Width(width).Foreground(t.TextMuted()).Render(resultContent)
+		return baseStyle.Width(width).Foreground(lipgloss.Color(t.TextMuted())).Render(resultContent)
 	case tools.ViewToolName:
 		metadata := tools.ViewResponseMetadata{}
 		json.Unmarshal([]byte(response.Metadata), &metadata)
@@ -505,7 +505,7 @@ func renderToolResponse(toolCall message.ToolCall, response message.ToolResult, 
 		resultContent = fmt.Sprintf("```%s\n%s\n```", ext, truncateHeight(metadata.Content, maxResultHeight))
 		return styles.ForceReplaceBackgroundWithLipgloss(
 			toMarkdown(resultContent, true, width),
-			t.Background(),
+			lipgloss.Color(t.Background()),
 		)
 	case tools.WriteToolName:
 		params := tools.WriteParams{}
@@ -521,13 +521,13 @@ func renderToolResponse(toolCall message.ToolCall, response message.ToolResult, 
 		resultContent = fmt.Sprintf("```%s\n%s\n```", ext, truncateHeight(params.Content, maxResultHeight))
 		return styles.ForceReplaceBackgroundWithLipgloss(
 			toMarkdown(resultContent, true, width),
-			t.Background(),
+			lipgloss.Color(t.Background()),
 		)
 	default:
 		resultContent = fmt.Sprintf("```text\n%s\n```", resultContent)
 		return styles.ForceReplaceBackgroundWithLipgloss(
 			toMarkdown(resultContent, true, width),
-			t.Background(),
+			lipgloss.Color(t.Background()),
 		)
 	}
 }
@@ -553,10 +553,10 @@ func renderToolMessage(
 		BorderLeft(true).
 		BorderStyle(lipgloss.ThickBorder()).
 		PaddingLeft(1).
-		BorderForeground(t.TextMuted())
+		BorderForeground(lipgloss.Color(t.TextMuted()))
 
 	response := findToolResponse(toolCall.ID, allMessages)
-	toolNameText := baseStyle.Foreground(t.TextMuted()).
+	toolNameText := baseStyle.Foreground(lipgloss.Color(t.TextMuted())).
 		Render(fmt.Sprintf("%s: ", toolName(toolCall.Name)))
 
 	if !toolCall.Finished {
@@ -565,7 +565,7 @@ func renderToolMessage(
 
 		progressText := baseStyle.
 			Width(width - 2 - lipgloss.Width(toolNameText)).
-			Foreground(t.TextMuted()).
+			Foreground(lipgloss.Color(t.TextMuted())).
 			Render(fmt.Sprintf("%s", toolAction))
 
 		content := style.Render(lipgloss.JoinHorizontal(lipgloss.Left, toolNameText, progressText))
@@ -587,7 +587,7 @@ func renderToolMessage(
 		responseContent = baseStyle.
 			Italic(true).
 			Width(width - 2).
-			Foreground(t.TextMuted()).
+			Foreground(lipgloss.Color(t.TextMuted())).
 			Render("Waiting for response...")
 	}
 
@@ -595,17 +595,17 @@ func renderToolMessage(
 	if !nested {
 		formattedParams := baseStyle.
 			Width(width - 2 - lipgloss.Width(toolNameText)).
-			Foreground(t.TextMuted()).
+			Foreground(lipgloss.Color(t.TextMuted())).
 			Render(params)
 
 		parts = append(parts, lipgloss.JoinHorizontal(lipgloss.Left, toolNameText, formattedParams))
 	} else {
 		prefix := baseStyle.
-			Foreground(t.TextMuted()).
+			Foreground(lipgloss.Color(t.TextMuted())).
 			Render(" └ ")
 		formattedParams := baseStyle.
 			Width(width - 2 - lipgloss.Width(toolNameText)).
-			Foreground(t.TextMuted()).
+			Foreground(lipgloss.Color(t.TextMuted())).
 			Render(params)
 		parts = append(parts, lipgloss.JoinHorizontal(lipgloss.Left, prefix, toolNameText, formattedParams))
 	}

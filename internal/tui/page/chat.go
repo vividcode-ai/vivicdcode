@@ -4,9 +4,10 @@ import (
 	"context"
 	"strings"
 
-	"github.com/charmbracelet/bubbles/key"
-	tea "github.com/charmbracelet/bubbletea"
-	"github.com/charmbracelet/lipgloss"
+	"charm.land/bubbles/v2/key"
+	tea "charm.land/bubbletea/v2"
+	"charm.land/lipgloss/v2"
+	uv "github.com/charmbracelet/ultraviolet"
 	"github.com/vividcode-ai/vividcode/internal/app"
 	"github.com/vividcode-ai/vividcode/internal/completions"
 	"github.com/vividcode-ai/vividcode/internal/message"
@@ -76,7 +77,7 @@ func (p *chatPage) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		if p.app.CoderAgent.IsBusy() {
 			return p, util.ReportWarn("Agent is busy, please wait before executing a command...")
 		}
-		
+
 		// Process the command content with arguments if any
 		content := msg.Content
 		if msg.Args != nil {
@@ -86,7 +87,7 @@ func (p *chatPage) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				content = strings.ReplaceAll(content, placeholder, value)
 			}
 		}
-		
+
 		// Handle custom command execution
 		cmd := p.sendMessage(content, nil)
 		if cmd != nil {
@@ -183,15 +184,15 @@ func (p *chatPage) GetSize() (int, int) {
 	return p.layout.GetSize()
 }
 
-func (p *chatPage) View() string {
-	layoutView := p.layout.View()
+func (p *chatPage) View() tea.View {
+	layoutView := p.layout.View().Content
 
 	if p.showCompletionDialog {
 		_, layoutHeight := p.layout.GetSize()
 		editorWidth, editorHeight := p.editor.GetSize()
 
 		p.completionDialog.SetWidth(editorWidth)
-		overlay := p.completionDialog.View()
+		overlay := p.completionDialog.View().Content
 
 		layoutView = layout.PlaceOverlay(
 			0,
@@ -202,7 +203,7 @@ func (p *chatPage) View() string {
 		)
 	}
 
-	return layoutView
+	return tea.View{Content: layoutView}
 }
 
 func (p *chatPage) BindingKeys() []key.Binding {
@@ -210,6 +211,12 @@ func (p *chatPage) BindingKeys() []key.Binding {
 	bindings = append(bindings, p.messages.BindingKeys()...)
 	bindings = append(bindings, p.editor.BindingKeys()...)
 	return bindings
+}
+
+func (p *chatPage) Draw(scr uv.Screen, area uv.Rectangle) *tea.Cursor {
+	view := p.View().Content
+	uv.NewStyledString(view).Draw(scr, area)
+	return nil
 }
 
 func NewChatPage(app *app.App) tea.Model {

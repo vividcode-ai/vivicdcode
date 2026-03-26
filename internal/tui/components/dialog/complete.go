@@ -1,13 +1,15 @@
 package dialog
 
 import (
-	"github.com/charmbracelet/bubbles/key"
-	"github.com/charmbracelet/bubbles/textarea"
-	tea "github.com/charmbracelet/bubbletea"
-	"github.com/charmbracelet/lipgloss"
+	"charm.land/bubbles/v2/key"
+	"charm.land/bubbles/v2/textarea"
+	tea "charm.land/bubbletea/v2"
+	"charm.land/lipgloss/v2"
+	uv "github.com/charmbracelet/ultraviolet"
 	"github.com/vividcode-ai/vividcode/internal/logging"
 	utilComponents "github.com/vividcode-ai/vividcode/internal/tui/components/util"
 	"github.com/vividcode-ai/vividcode/internal/tui/layout"
+	"github.com/vividcode-ai/vividcode/internal/tui/render"
 	"github.com/vividcode-ai/vividcode/internal/tui/styles"
 	"github.com/vividcode-ai/vividcode/internal/tui/theme"
 	"github.com/vividcode-ai/vividcode/internal/tui/util"
@@ -35,8 +37,8 @@ func (ci *CompletionItem) Render(selected bool, width int) string {
 
 	if selected {
 		itemStyle = itemStyle.
-			Background(t.Background()).
-			Foreground(t.Primary()).
+			Background(lipgloss.Color(t.Background())).
+			Foreground(lipgloss.Color(t.Primary())).
 			Bold(true)
 	}
 
@@ -204,7 +206,7 @@ func (c *completionDialogCmp) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	return c, tea.Batch(cmds...)
 }
 
-func (c *completionDialogCmp) View() string {
+func (c *completionDialogCmp) View() tea.View {
 	t := theme.CurrentTheme()
 	baseStyle := styles.BaseStyle()
 
@@ -221,15 +223,21 @@ func (c *completionDialogCmp) View() string {
 
 	c.listView.SetMaxWidth(maxWidth)
 
-	return baseStyle.Padding(0, 0).
+	return tea.View{Content: baseStyle.Padding(0, 0).
 		Border(lipgloss.NormalBorder()).
 		BorderBottom(false).
 		BorderRight(false).
 		BorderLeft(false).
-		BorderBackground(t.Background()).
-		BorderForeground(t.TextMuted()).
+		BorderBackground(lipgloss.Color(t.Background())).
+		BorderForeground(lipgloss.Color(t.TextMuted())).
 		Width(c.width).
-		Render(c.listView.View())
+		Render(c.listView.View().Content)}
+}
+
+func (c *completionDialogCmp) Draw(scr uv.Screen, area uv.Rectangle) *tea.Cursor {
+	view := c.View().Content
+	render.DrawCenter(scr, area, view)
+	return nil
 }
 
 func (c *completionDialogCmp) SetWidth(width int) {

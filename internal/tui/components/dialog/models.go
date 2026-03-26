@@ -5,12 +5,14 @@ import (
 	"slices"
 	"strings"
 
-	"github.com/charmbracelet/bubbles/key"
-	tea "github.com/charmbracelet/bubbletea"
-	"github.com/charmbracelet/lipgloss"
+	"charm.land/bubbles/v2/key"
+	tea "charm.land/bubbletea/v2"
+	"charm.land/lipgloss/v2"
+	uv "github.com/charmbracelet/ultraviolet"
 	"github.com/vividcode-ai/vividcode/internal/config"
 	"github.com/vividcode-ai/vividcode/internal/llm/models"
 	"github.com/vividcode-ai/vividcode/internal/tui/layout"
+	"github.com/vividcode-ai/vividcode/internal/tui/render"
 	"github.com/vividcode-ai/vividcode/internal/tui/styles"
 	"github.com/vividcode-ai/vividcode/internal/tui/theme"
 	"github.com/vividcode-ai/vividcode/internal/tui/util"
@@ -33,6 +35,7 @@ type CloseModelDialogMsg struct{}
 type ModelDialog interface {
 	tea.Model
 	layout.Bindings
+	Draw(scr uv.Screen, area uv.Rectangle) *tea.Cursor
 }
 
 type modelDialogCmp struct {
@@ -185,14 +188,14 @@ func (m *modelDialogCmp) switchProvider(offset int) {
 	m.setupModelsForProvider(m.provider)
 }
 
-func (m *modelDialogCmp) View() string {
+func (m *modelDialogCmp) View() tea.View {
 	t := theme.CurrentTheme()
 	baseStyle := styles.BaseStyle()
 
 	// Capitalize first letter of provider name
 	providerName := strings.ToUpper(string(m.provider)[:1]) + string(m.provider[1:])
 	title := baseStyle.
-		Foreground(t.Primary()).
+		Foreground(lipgloss.Color(t.Primary())).
 		Bold(true).
 		Width(maxDialogWidth).
 		Padding(0, 0, 1).
@@ -205,8 +208,8 @@ func (m *modelDialogCmp) View() string {
 	for i := m.scrollOffset; i < endIdx; i++ {
 		itemStyle := baseStyle.Width(maxDialogWidth)
 		if i == m.selectedIdx {
-			itemStyle = itemStyle.Background(t.Primary()).
-				Foreground(t.Background()).Bold(true)
+			itemStyle = itemStyle.Background(lipgloss.Color(t.Primary())).
+				Foreground(lipgloss.Color(t.Background())).Bold(true)
 		}
 		modelItems = append(modelItems, itemStyle.Render(m.models[i].Name))
 	}
@@ -220,12 +223,18 @@ func (m *modelDialogCmp) View() string {
 		scrollIndicator,
 	)
 
-	return baseStyle.Padding(1, 2).
+	return tea.View{Content: baseStyle.Padding(1, 2).
 		Border(lipgloss.RoundedBorder()).
-		BorderBackground(t.Background()).
-		BorderForeground(t.TextMuted()).
+		BorderBackground(lipgloss.Color(t.Background())).
+		BorderForeground(lipgloss.Color(t.TextMuted())).
 		Width(lipgloss.Width(content) + 4).
-		Render(content)
+		Render(content)}
+}
+
+func (m *modelDialogCmp) Draw(scr uv.Screen, area uv.Rectangle) *tea.Cursor {
+	view := m.View().Content
+	render.DrawCenter(scr, area, view)
+	return nil
 }
 
 func (m *modelDialogCmp) getScrollIndicators(maxWidth int) string {
@@ -257,7 +266,7 @@ func (m *modelDialogCmp) getScrollIndicators(maxWidth int) string {
 	baseStyle := styles.BaseStyle()
 
 	return baseStyle.
-		Foreground(t.Primary()).
+		Foreground(lipgloss.Color(t.Primary())).
 		Width(maxWidth).
 		Align(lipgloss.Right).
 		Bold(true).

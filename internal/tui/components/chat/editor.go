@@ -8,10 +8,10 @@ import (
 	"strings"
 	"unicode"
 
-	"github.com/charmbracelet/bubbles/key"
-	"github.com/charmbracelet/bubbles/textarea"
-	tea "github.com/charmbracelet/bubbletea"
-	"github.com/charmbracelet/lipgloss"
+	"charm.land/bubbles/v2/key"
+	"charm.land/bubbles/v2/textarea"
+	tea "charm.land/bubbletea/v2"
+	"charm.land/lipgloss/v2"
 	"github.com/vividcode-ai/vividcode/internal/app"
 	"github.com/vividcode-ai/vividcode/internal/logging"
 	"github.com/vividcode-ai/vividcode/internal/message"
@@ -172,16 +172,19 @@ func (m *editorCmp) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.attachments = nil
 			return m, nil
 		}
-		if m.deleteMode && len(msg.Runes) > 0 && unicode.IsDigit(msg.Runes[0]) {
-			num := int(msg.Runes[0] - '0')
-			m.deleteMode = false
-			if num < 10 && len(m.attachments) > num {
-				if num == 0 {
-					m.attachments = m.attachments[num+1:]
-				} else {
-					m.attachments = slices.Delete(m.attachments, num, num+1)
+		if m.deleteMode {
+			key := msg.Key()
+			if len(key.Text) > 0 && unicode.IsDigit(rune(key.Text[0])) {
+				num := int(key.Text[0] - '0')
+				m.deleteMode = false
+				if num < 10 && len(m.attachments) > num {
+					if num == 0 {
+						m.attachments = m.attachments[num+1:]
+					} else {
+						m.attachments = slices.Delete(m.attachments, num, num+1)
+					}
+					return m, nil
 				}
-				return m, nil
 			}
 		}
 		if key.Matches(msg, messageKeys.PageUp) || key.Matches(msg, messageKeys.PageDown) ||
@@ -216,24 +219,24 @@ func (m *editorCmp) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	return m, cmd
 }
 
-func (m *editorCmp) View() string {
+func (m *editorCmp) View() tea.View {
 	t := theme.CurrentTheme()
 
 	// Style the prompt with theme colors
 	style := lipgloss.NewStyle().
 		Padding(0, 0, 0, 1).
 		Bold(true).
-		Foreground(t.Primary())
+		Foreground(lipgloss.Color(t.Primary()))
 
 	if len(m.attachments) == 0 {
-		return lipgloss.JoinHorizontal(lipgloss.Top, style.Render(">"), m.textarea.View())
+		return tea.View{Content: lipgloss.JoinHorizontal(lipgloss.Top, style.Render(">"), m.textarea.View())}
 	}
 	m.textarea.SetHeight(m.height - 1)
-	return lipgloss.JoinVertical(lipgloss.Top,
+	return tea.View{Content: lipgloss.JoinVertical(lipgloss.Top,
 		m.attachmentsContent(),
 		lipgloss.JoinHorizontal(lipgloss.Top, style.Render(">"),
 			m.textarea.View()),
-	)
+	)}
 }
 
 func (m *editorCmp) SetSize(width, height int) tea.Cmd {
@@ -254,8 +257,8 @@ func (m *editorCmp) attachmentsContent() string {
 	t := theme.CurrentTheme()
 	attachmentStyles := styles.BaseStyle().
 		MarginLeft(1).
-		Background(t.TextMuted()).
-		Foreground(t.Text())
+		Background(lipgloss.Color(t.TextMuted())).
+		Foreground(lipgloss.Color(t.Text()))
 	for i, attachment := range m.attachments {
 		var filename string
 		if len(attachment.FileName) > 10 {
@@ -281,19 +284,30 @@ func (m *editorCmp) BindingKeys() []key.Binding {
 
 func CreateTextArea(existing *textarea.Model) textarea.Model {
 	t := theme.CurrentTheme()
-	bgColor := t.Background()
-	textColor := t.Text()
-	textMutedColor := t.TextMuted()
+	bgColor := lipgloss.Color(t.Background())
+	textColor := lipgloss.Color(t.Text())
+	textMutedColor := lipgloss.Color(t.TextMuted())
 
 	ta := textarea.New()
-	ta.BlurredStyle.Base = styles.BaseStyle().Background(bgColor).Foreground(textColor)
-	ta.BlurredStyle.CursorLine = styles.BaseStyle().Background(bgColor)
-	ta.BlurredStyle.Placeholder = styles.BaseStyle().Background(bgColor).Foreground(textMutedColor)
-	ta.BlurredStyle.Text = styles.BaseStyle().Background(bgColor).Foreground(textColor)
-	ta.FocusedStyle.Base = styles.BaseStyle().Background(bgColor).Foreground(textColor)
-	ta.FocusedStyle.CursorLine = styles.BaseStyle().Background(bgColor)
-	ta.FocusedStyle.Placeholder = styles.BaseStyle().Background(bgColor).Foreground(textMutedColor)
-	ta.FocusedStyle.Text = styles.BaseStyle().Background(bgColor).Foreground(textColor)
+
+	blurredStyles := textarea.StyleState{
+		Base:        styles.BaseStyle().Background(bgColor).Foreground(textColor),
+		Text:        styles.BaseStyle().Background(bgColor).Foreground(textColor),
+		Placeholder: styles.BaseStyle().Background(bgColor).Foreground(textMutedColor),
+		CursorLine:  styles.BaseStyle().Background(bgColor),
+	}
+
+	focusedStyles := textarea.StyleState{
+		Base:        styles.BaseStyle().Background(bgColor).Foreground(textColor),
+		Text:        styles.BaseStyle().Background(bgColor).Foreground(textColor),
+		Placeholder: styles.BaseStyle().Background(bgColor).Foreground(textMutedColor),
+		CursorLine:  styles.BaseStyle().Background(bgColor),
+	}
+
+	ta.SetStyles(textarea.Styles{
+		Focused: focusedStyles,
+		Blurred: blurredStyles,
+	})
 
 	ta.Prompt = " "
 	ta.ShowLineNumbers = false

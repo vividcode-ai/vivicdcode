@@ -1,11 +1,13 @@
 package dialog
 
 import (
-	"github.com/charmbracelet/bubbles/key"
-	tea "github.com/charmbracelet/bubbletea"
-	"github.com/charmbracelet/lipgloss"
+	"charm.land/bubbles/v2/key"
+	tea "charm.land/bubbletea/v2"
+	"charm.land/lipgloss/v2"
+	uv "github.com/charmbracelet/ultraviolet"
 	"github.com/vividcode-ai/vividcode/internal/session"
 	"github.com/vividcode-ai/vividcode/internal/tui/layout"
+	"github.com/vividcode-ai/vividcode/internal/tui/render"
 	"github.com/vividcode-ai/vividcode/internal/tui/styles"
 	"github.com/vividcode-ai/vividcode/internal/tui/theme"
 	"github.com/vividcode-ai/vividcode/internal/tui/util"
@@ -25,6 +27,7 @@ type SessionDialog interface {
 	layout.Bindings
 	SetSessions(sessions []session.Session)
 	SetSelectedSession(sessionID string)
+	Draw(scr uv.Screen, area uv.Rectangle) *tea.Cursor
 }
 
 type sessionDialogCmp struct {
@@ -105,17 +108,17 @@ func (s *sessionDialogCmp) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	return s, nil
 }
 
-func (s *sessionDialogCmp) View() string {
+func (s *sessionDialogCmp) View() tea.View {
 	t := theme.CurrentTheme()
 	baseStyle := styles.BaseStyle()
-	
+
 	if len(s.sessions) == 0 {
-		return baseStyle.Padding(1, 2).
+		return tea.View{Content: baseStyle.Padding(1, 2).
 			Border(lipgloss.RoundedBorder()).
-			BorderBackground(t.Background()).
-			BorderForeground(t.TextMuted()).
+			BorderBackground(lipgloss.Color(t.Background())).
+			BorderForeground(lipgloss.Color(t.TextMuted())).
 			Width(40).
-			Render("No sessions available")
+			Render("No sessions available")}
 	}
 
 	// Calculate max width needed for session titles
@@ -154,8 +157,8 @@ func (s *sessionDialogCmp) View() string {
 
 		if i == s.selectedIdx {
 			itemStyle = itemStyle.
-				Background(t.Primary()).
-				Foreground(t.Background()).
+				Background(lipgloss.Color(t.Primary())).
+				Foreground(lipgloss.Color(t.Background())).
 				Bold(true)
 		}
 
@@ -163,7 +166,7 @@ func (s *sessionDialogCmp) View() string {
 	}
 
 	title := baseStyle.
-		Foreground(t.Primary()).
+		Foreground(lipgloss.Color(t.Primary())).
 		Bold(true).
 		Width(maxWidth).
 		Padding(0, 1).
@@ -177,12 +180,18 @@ func (s *sessionDialogCmp) View() string {
 		baseStyle.Width(maxWidth).Render(""),
 	)
 
-	return baseStyle.Padding(1, 2).
+	return tea.View{Content: baseStyle.Padding(1, 2).
 		Border(lipgloss.RoundedBorder()).
-		BorderBackground(t.Background()).
-		BorderForeground(t.TextMuted()).
+		BorderBackground(lipgloss.Color(t.Background())).
+		BorderForeground(lipgloss.Color(t.TextMuted())).
 		Width(lipgloss.Width(content) + 4).
-		Render(content)
+		Render(content)}
+}
+
+func (s *sessionDialogCmp) Draw(scr uv.Screen, area uv.Rectangle) *tea.Cursor {
+	view := s.View().Content
+	render.DrawCenter(scr, area, view)
+	return nil
 }
 
 func (s *sessionDialogCmp) BindingKeys() []key.Binding {

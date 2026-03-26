@@ -1,19 +1,12 @@
 package theme
 
-import (
-	"github.com/charmbracelet/lipgloss"
-)
-
 // TronTheme implements the Theme interface with Tron-inspired colors.
-// It provides both dark and light variants, though Tron is primarily a dark theme.
 type TronTheme struct {
 	BaseTheme
 }
 
 // NewTronTheme creates a new instance of the Tron theme.
 func NewTronTheme() *TronTheme {
-	// Tron color palette
-	// Inspired by the Tron movie's neon aesthetic
 	darkBackground := "#0c141f"
 	darkCurrentLine := "#1a2633"
 	darkSelection := "#1a2633"
@@ -29,243 +22,74 @@ func NewTronTheme() *TronTheme {
 	darkGreen := "#00ff8f"
 	darkBorder := "#1a2633"
 
-	// Light mode approximation
-	lightBackground := "#f0f8ff"
-	lightCurrentLine := "#e0f0ff"
-	lightSelection := "#d0e8ff"
-	lightForeground := "#0c141f"
-	lightComment := "#4d6b87"
-	lightCyan := "#0097b3"
-	lightBlue := "#0066cc"
-	lightOrange := "#cc7300"
-	lightPink := "#cc0080"
-	lightPurple := "#9932cc"
-	lightRed := "#cc2929"
-	lightYellow := "#cc9900"
-	lightGreen := "#00cc72"
-	lightBorder := "#d0e8ff"
-
 	theme := &TronTheme{}
 
 	// Base colors
-	theme.PrimaryColor = lipgloss.AdaptiveColor{
-		Dark:  darkCyan,
-		Light: lightCyan,
-	}
-	theme.SecondaryColor = lipgloss.AdaptiveColor{
-		Dark:  darkBlue,
-		Light: lightBlue,
-	}
-	theme.AccentColor = lipgloss.AdaptiveColor{
-		Dark:  darkOrange,
-		Light: lightOrange,
-	}
+	theme.PrimaryColor = darkCyan
+	theme.SecondaryColor = darkBlue
+	theme.AccentColor = darkOrange
 
 	// Status colors
-	theme.ErrorColor = lipgloss.AdaptiveColor{
-		Dark:  darkRed,
-		Light: lightRed,
-	}
-	theme.WarningColor = lipgloss.AdaptiveColor{
-		Dark:  darkOrange,
-		Light: lightOrange,
-	}
-	theme.SuccessColor = lipgloss.AdaptiveColor{
-		Dark:  darkGreen,
-		Light: lightGreen,
-	}
-	theme.InfoColor = lipgloss.AdaptiveColor{
-		Dark:  darkCyan,
-		Light: lightCyan,
-	}
+	theme.ErrorColor = darkRed
+	theme.WarningColor = darkOrange
+	theme.SuccessColor = darkGreen
+	theme.InfoColor = darkCyan
 
 	// Text colors
-	theme.TextColor = lipgloss.AdaptiveColor{
-		Dark:  darkForeground,
-		Light: lightForeground,
-	}
-	theme.TextMutedColor = lipgloss.AdaptiveColor{
-		Dark:  darkComment,
-		Light: lightComment,
-	}
-	theme.TextEmphasizedColor = lipgloss.AdaptiveColor{
-		Dark:  darkYellow,
-		Light: lightYellow,
-	}
+	theme.TextColor = darkForeground
+	theme.TextMutedColor = darkComment
+	theme.TextEmphasizedColor = darkYellow
 
 	// Background colors
-	theme.BackgroundColor = lipgloss.AdaptiveColor{
-		Dark:  darkBackground,
-		Light: lightBackground,
-	}
-	theme.BackgroundSecondaryColor = lipgloss.AdaptiveColor{
-		Dark:  darkCurrentLine,
-		Light: lightCurrentLine,
-	}
-	theme.BackgroundDarkerColor = lipgloss.AdaptiveColor{
-		Dark:  "#070d14", // Slightly darker than background
-		Light: "#ffffff", // Slightly lighter than background
-	}
+	theme.BackgroundColor = darkBackground
+	theme.BackgroundSecondaryColor = darkCurrentLine
+	theme.BackgroundDarkerColor = "#070d14"
 
 	// Border colors
-	theme.BorderNormalColor = lipgloss.AdaptiveColor{
-		Dark:  darkBorder,
-		Light: lightBorder,
-	}
-	theme.BorderFocusedColor = lipgloss.AdaptiveColor{
-		Dark:  darkCyan,
-		Light: lightCyan,
-	}
-	theme.BorderDimColor = lipgloss.AdaptiveColor{
-		Dark:  darkSelection,
-		Light: lightSelection,
-	}
+	theme.BorderNormalColor = darkBorder
+	theme.BorderFocusedColor = darkCyan
+	theme.BorderDimColor = darkSelection
 
 	// Diff view colors
-	theme.DiffAddedColor = lipgloss.AdaptiveColor{
-		Dark:  darkGreen,
-		Light: lightGreen,
-	}
-	theme.DiffRemovedColor = lipgloss.AdaptiveColor{
-		Dark:  darkRed,
-		Light: lightRed,
-	}
-	theme.DiffContextColor = lipgloss.AdaptiveColor{
-		Dark:  darkComment,
-		Light: lightComment,
-	}
-	theme.DiffHunkHeaderColor = lipgloss.AdaptiveColor{
-		Dark:  darkBlue,
-		Light: lightBlue,
-	}
-	theme.DiffHighlightAddedColor = lipgloss.AdaptiveColor{
-		Dark:  "#00ff8f",
-		Light: "#a5d6a7",
-	}
-	theme.DiffHighlightRemovedColor = lipgloss.AdaptiveColor{
-		Dark:  "#ff3333",
-		Light: "#ef9a9a",
-	}
-	theme.DiffAddedBgColor = lipgloss.AdaptiveColor{
-		Dark:  "#0a2a1a",
-		Light: "#e8f5e9",
-	}
-	theme.DiffRemovedBgColor = lipgloss.AdaptiveColor{
-		Dark:  "#2a0a0a",
-		Light: "#ffebee",
-	}
-	theme.DiffContextBgColor = lipgloss.AdaptiveColor{
-		Dark:  darkBackground,
-		Light: lightBackground,
-	}
-	theme.DiffLineNumberColor = lipgloss.AdaptiveColor{
-		Dark:  darkComment,
-		Light: lightComment,
-	}
-	theme.DiffAddedLineNumberBgColor = lipgloss.AdaptiveColor{
-		Dark:  "#082015",
-		Light: "#c8e6c9",
-	}
-	theme.DiffRemovedLineNumberBgColor = lipgloss.AdaptiveColor{
-		Dark:  "#200808",
-		Light: "#ffcdd2",
-	}
+	theme.DiffAddedColor = darkGreen
+	theme.DiffRemovedColor = darkRed
+	theme.DiffContextColor = darkComment
+	theme.DiffHunkHeaderColor = darkBlue
+	theme.DiffHighlightAddedColor = "#00ff8f"
+	theme.DiffHighlightRemovedColor = "#ff3333"
+	theme.DiffAddedBgColor = "#0a2a1a"
+	theme.DiffRemovedBgColor = "#2a0a0a"
+	theme.DiffContextBgColor = darkBackground
+	theme.DiffLineNumberColor = darkComment
+	theme.DiffAddedLineNumberBgColor = "#082015"
+	theme.DiffRemovedLineNumberBgColor = "#200808"
 
 	// Markdown colors
-	theme.MarkdownTextColor = lipgloss.AdaptiveColor{
-		Dark:  darkForeground,
-		Light: lightForeground,
-	}
-	theme.MarkdownHeadingColor = lipgloss.AdaptiveColor{
-		Dark:  darkCyan,
-		Light: lightCyan,
-	}
-	theme.MarkdownLinkColor = lipgloss.AdaptiveColor{
-		Dark:  darkBlue,
-		Light: lightBlue,
-	}
-	theme.MarkdownLinkTextColor = lipgloss.AdaptiveColor{
-		Dark:  darkCyan,
-		Light: lightCyan,
-	}
-	theme.MarkdownCodeColor = lipgloss.AdaptiveColor{
-		Dark:  darkGreen,
-		Light: lightGreen,
-	}
-	theme.MarkdownBlockQuoteColor = lipgloss.AdaptiveColor{
-		Dark:  darkYellow,
-		Light: lightYellow,
-	}
-	theme.MarkdownEmphColor = lipgloss.AdaptiveColor{
-		Dark:  darkYellow,
-		Light: lightYellow,
-	}
-	theme.MarkdownStrongColor = lipgloss.AdaptiveColor{
-		Dark:  darkOrange,
-		Light: lightOrange,
-	}
-	theme.MarkdownHorizontalRuleColor = lipgloss.AdaptiveColor{
-		Dark:  darkComment,
-		Light: lightComment,
-	}
-	theme.MarkdownListItemColor = lipgloss.AdaptiveColor{
-		Dark:  darkBlue,
-		Light: lightBlue,
-	}
-	theme.MarkdownListEnumerationColor = lipgloss.AdaptiveColor{
-		Dark:  darkCyan,
-		Light: lightCyan,
-	}
-	theme.MarkdownImageColor = lipgloss.AdaptiveColor{
-		Dark:  darkBlue,
-		Light: lightBlue,
-	}
-	theme.MarkdownImageTextColor = lipgloss.AdaptiveColor{
-		Dark:  darkCyan,
-		Light: lightCyan,
-	}
-	theme.MarkdownCodeBlockColor = lipgloss.AdaptiveColor{
-		Dark:  darkForeground,
-		Light: lightForeground,
-	}
+	theme.MarkdownTextColor = darkForeground
+	theme.MarkdownHeadingColor = darkCyan
+	theme.MarkdownLinkColor = darkBlue
+	theme.MarkdownLinkTextColor = darkCyan
+	theme.MarkdownCodeColor = darkGreen
+	theme.MarkdownBlockQuoteColor = darkYellow
+	theme.MarkdownEmphColor = darkYellow
+	theme.MarkdownStrongColor = darkOrange
+	theme.MarkdownHorizontalRuleColor = darkComment
+	theme.MarkdownListItemColor = darkBlue
+	theme.MarkdownListEnumerationColor = darkCyan
+	theme.MarkdownImageColor = darkBlue
+	theme.MarkdownImageTextColor = darkCyan
+	theme.MarkdownCodeBlockColor = darkForeground
 
 	// Syntax highlighting colors
-	theme.SyntaxCommentColor = lipgloss.AdaptiveColor{
-		Dark:  darkComment,
-		Light: lightComment,
-	}
-	theme.SyntaxKeywordColor = lipgloss.AdaptiveColor{
-		Dark:  darkCyan,
-		Light: lightCyan,
-	}
-	theme.SyntaxFunctionColor = lipgloss.AdaptiveColor{
-		Dark:  darkGreen,
-		Light: lightGreen,
-	}
-	theme.SyntaxVariableColor = lipgloss.AdaptiveColor{
-		Dark:  darkOrange,
-		Light: lightOrange,
-	}
-	theme.SyntaxStringColor = lipgloss.AdaptiveColor{
-		Dark:  darkYellow,
-		Light: lightYellow,
-	}
-	theme.SyntaxNumberColor = lipgloss.AdaptiveColor{
-		Dark:  darkBlue,
-		Light: lightBlue,
-	}
-	theme.SyntaxTypeColor = lipgloss.AdaptiveColor{
-		Dark:  darkPurple,
-		Light: lightPurple,
-	}
-	theme.SyntaxOperatorColor = lipgloss.AdaptiveColor{
-		Dark:  darkPink,
-		Light: lightPink,
-	}
-	theme.SyntaxPunctuationColor = lipgloss.AdaptiveColor{
-		Dark:  darkForeground,
-		Light: lightForeground,
-	}
+	theme.SyntaxCommentColor = darkComment
+	theme.SyntaxKeywordColor = darkCyan
+	theme.SyntaxFunctionColor = darkGreen
+	theme.SyntaxVariableColor = darkOrange
+	theme.SyntaxStringColor = darkYellow
+	theme.SyntaxNumberColor = darkBlue
+	theme.SyntaxTypeColor = darkPurple
+	theme.SyntaxOperatorColor = darkPink
+	theme.SyntaxPunctuationColor = darkForeground
 
 	return theme
 }
