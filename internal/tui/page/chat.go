@@ -242,7 +242,8 @@ func NewChatPage(app *app.App) tea.Model {
 		completionDialog: completionDialog,
 		layout: layout.NewSplitPane(
 			layout.WithLeftPanel(messagesContainer),
-			layout.WithBottomPanelFixed(editorContainer, 5),
+			layout.WithBottomPanel(editorContainer),
+			layout.WithVerticalRatio(0.9), // main 占 90%, editor 占 10%
 		),
 	}
 }

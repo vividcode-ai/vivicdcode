@@ -4,11 +4,13 @@ import (
 	"context"
 	"fmt"
 	"image"
+	"log"
 	"math/rand"
 	"strings"
 
 	"charm.land/bubbles/v2/key"
 	tea "charm.land/bubbletea/v2"
+	"charm.land/lipgloss/v2"
 	uv "github.com/charmbracelet/ultraviolet"
 	"github.com/charmbracelet/ultraviolet/screen"
 	"github.com/vividcode-ai/vividcode/internal/app"
@@ -24,6 +26,8 @@ import (
 	"github.com/vividcode-ai/vividcode/internal/tui/layout"
 	"github.com/vividcode-ai/vividcode/internal/tui/page"
 	"github.com/vividcode-ai/vividcode/internal/tui/render"
+	"github.com/vividcode-ai/vividcode/internal/tui/styles"
+	"github.com/vividcode-ai/vividcode/internal/tui/theme"
 	"github.com/vividcode-ai/vividcode/internal/tui/util"
 )
 
@@ -108,20 +112,50 @@ const (
 	FocusMain
 )
 
+// uiState represents the current UI state of the application.
+type uiState uint8
+
+// Possible uiState values.
+const (
+	uiOnboarding uiState = iota // 未配置 API key
+	uiInitialize                // 需要初始化项目
+	uiLanding                   // 已配置但无会话
+	uiChat                      // 聊天状态
+)
+
+// Compact mode breakpoints
+const (
+	compactModeWidthBreakpoint  = 120
+	compactModeHeightBreakpoint = 30
+)
+
 type uiLayout struct {
-	area   uv.Rectangle
-	main   uv.Rectangle
-	editor uv.Rectangle
-	status uv.Rectangle
-	dialog uv.Rectangle
+	area           uv.Rectangle
+	header         uv.Rectangle
+	sidebar        uv.Rectangle
+	main           uv.Rectangle
+	pills          uv.Rectangle
+	editor         uv.Rectangle
+	status         uv.Rectangle
+	sessionDetails uv.Rectangle // Compact mode session details
 }
 
 type appModel struct {
-	width, height   int
-	currentPage     page.PageID
-	previousPage    page.PageID
-	pages           map[page.PageID]tea.Model
-	loadedPages     map[page.PageID]bool
+	width, height int
+
+	// UI state (replaces page.PageID)
+	state              uiState
+	isCompact          bool
+	forceCompactMode   bool
+	sessionDetailsOpen bool // Compact mode session details overlay
+
+	// Legacy page support - to be removed after migration
+	currentPage  page.PageID
+	previousPage page.PageID
+	pages        map[page.PageID]tea.Model
+	loadedPages  map[page.PageID]bool
+
+	// UI Components
 	status          core.StatusCmp
 	app             *app.App
 	selectedSession session.Session
@@ -157,14 +191,15 @@ type appModel struct {
 	showMultiArgumentsDialog bool
 	multiArgumentsDialog     dialog.MultiArgumentsDialogCmp
 
+	// Dialog management - unified overlay for all dialogs
+	dialogOverlay *render.Overlay
+
 	isCompacting      bool
 	compactingMessage string
 
 	layout uiLayout
 
 	focusState FocusState
-
-	dialog *render.Overlay
 
 	sendProgressBar    bool
 	progressBarEnabled bool
@@ -216,8 +251,20 @@ func (a appModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	var cmd tea.Cmd
 	switch msg := msg.(type) {
 	case tea.WindowSizeMsg:
+		log.Printf("Width:%d,Height:%d", msg.Width, msg.Height)
 		msg.Height -= 1 // Make space for the status bar
 		a.width, a.height = msg.Width, msg.Height
+
+		// Update compact mode based on window size
+		if a.state == uiChat {
+			if a.forceCompactMode {
+				a.isCompact = true
+			} else if a.width < compactModeWidthBreakpoint || a.height < compactModeHeightBreakpoint {
+				a.isCompact = true
+			} else {
+				a.isCompact = false
+			}
+		}
 
 		s, _ := a.status.Update(msg)
 		a.status = s.(core.StatusCmp)
@@ -749,25 +796,66 @@ func (a *appModel) moveToPage(pageID page.PageID) tea.Cmd {
 func (a appModel) generateLayout(w, h int) uiLayout {
 	area := image.Rect(0, 0, w, h)
 
+	helpHeight := 1
 	editorHeight := 5
-	statusHeight := 1
+	const landingHeaderHeight = 4
 
-	mainRect := image.Rect(0, 0, w, h-editorHeight-statusHeight)
-	editorRect := image.Rect(0, mainRect.Max.Y, w, mainRect.Max.Y+editorHeight)
-	statusRect := image.Rect(0, h-statusHeight, w, h)
-
-	return uiLayout{
-		area:   area,
-		main:   mainRect,
-		editor: editorRect,
-		status: statusRect,
+	uiLayout := uiLayout{
+		area: area,
 	}
+
+	switch a.state {
+	case uiOnboarding, uiInitialize:
+		mainHeight := h - helpHeight - landingHeaderHeight - 2
+		uiLayout.header = image.Rect(1, 1, w-1, landingHeaderHeight+1)
+		uiLayout.main = image.Rect(1, landingHeaderHeight+2, w-1, landingHeaderHeight+2+mainHeight)
+		uiLayout.status = image.Rect(0, h-helpHeight, w, h)
+
+	case uiLanding:
+		mainHeight := h - helpHeight - landingHeaderHeight - editorHeight - 4
+		uiLayout.header = image.Rect(1, 1, w-1, landingHeaderHeight+1)
+		uiLayout.main = image.Rect(1, landingHeaderHeight+2, w-1, landingHeaderHeight+2+mainHeight)
+		uiLayout.editor = image.Rect(1, h-helpHeight-editorHeight-1, w-1, h-helpHeight-1)
+		uiLayout.status = image.Rect(0, h-helpHeight, w, h)
+
+	case uiChat:
+		if a.isCompact {
+			const compactHeaderHeight = 1
+			mainHeight := h - helpHeight - compactHeaderHeight - editorHeight - 2
+
+			// Calculate session details area (overlay in compact mode)
+			detailsHeight := min(15, h-5)
+			uiLayout.sessionDetails = image.Rect(0, 0, w, detailsHeight)
+
+			uiLayout.header = image.Rect(1, 1, w-1, compactHeaderHeight+1)
+			uiLayout.main = image.Rect(1, compactHeaderHeight+2, w-1, compactHeaderHeight+2+mainHeight)
+			uiLayout.editor = image.Rect(1, h-helpHeight-editorHeight-1, w-1, h-helpHeight-1)
+			uiLayout.status = image.Rect(0, h-helpHeight, w, h)
+		} else {
+			///----------------
+			// Non-compact: let SplitPaneLayout handle sidebar, main takes full width
+			// mainHeight := h - helpHeight - editorHeight  // h - 1 - 5 = h - 6
+			// uiLayout.main = image.Rect(1, 1, w-2, mainHeight)
+			// uiLayout.editor = image.Rect(1, mainHeight, w-2, h-helpHeight)
+			// uiLayout.status = image.Rect(0, h-helpHeight, w, h)
+			///----------------
+			// Non-compact: let SplitPaneLayout handle sidebar and editor
+			// main + editor 紧贴 status
+			mainHeight := h - helpHeight
+			uiLayout.main = image.Rect(1, 1, w-2, mainHeight)
+			// editor 由 SplitPaneLayout 内部管理，不需要在这里设置
+			uiLayout.status = image.Rect(0, h-helpHeight, w, h)
+		}
+	}
+
+	return uiLayout
 }
 
 func (a *appModel) updateSize() {
 	a.status.SetWidth(a.layout.status.Dx())
 
 	if sizable, ok := a.pages[a.currentPage].(layout.Sizeable); ok {
+		// 传递 main 高度，让 SplitPaneLayout 根据 verticalRatio 动态分配
 		sizable.SetSize(a.layout.main.Dx(), a.layout.main.Dy())
 	}
 }
@@ -782,6 +870,39 @@ func (a appModel) Draw(scr uv.Screen, area uv.Rectangle) *tea.Cursor {
 
 	screen.Clear(scr)
 
+	// State-driven rendering
+	switch a.state {
+	case uiOnboarding, uiInitialize:
+		// Draw header
+		if a.layout.header.Dy() > 0 {
+			headerView := a.renderHeaderView(a.layout.header.Dx())
+			uv.NewStyledString(headerView).Draw(scr, a.layout.header)
+		}
+		// Main content is rendered by page
+
+	case uiLanding:
+		// Draw header
+		if a.layout.header.Dy() > 0 {
+			headerView := a.renderHeaderView(a.layout.header.Dx())
+			uv.NewStyledString(headerView).Draw(scr, a.layout.header)
+		}
+
+	case uiChat:
+		// Draw header or sidebar based on compact mode
+		if a.isCompact {
+			if a.layout.header.Dy() > 0 {
+				headerView := a.renderCompactHeaderView(a.layout.header.Dx())
+				uv.NewStyledString(headerView).Draw(scr, a.layout.header)
+			}
+			// Draw session details overlay in compact mode when open
+			if a.sessionDetailsOpen && a.layout.sessionDetails.Dy() > 0 && a.selectedSession.ID != "" {
+				detailsView := a.renderSessionDetailsView(a.layout.sessionDetails.Dx())
+				uv.NewStyledString(detailsView).Draw(scr, a.layout.sessionDetails)
+			}
+		}
+	}
+
+	// Draw main content (page-based for now, will migrate to direct)
 	var mainCursor *tea.Cursor
 	if drawable, ok := a.pages[a.currentPage].(interface {
 		Draw(scr uv.Screen, area uv.Rectangle) *tea.Cursor
@@ -792,6 +913,13 @@ func (a appModel) Draw(scr uv.Screen, area uv.Rectangle) *tea.Cursor {
 		uv.NewStyledString(mainContent).Draw(scr, a.layout.main)
 	}
 
+	// Draw editor (from page)
+	if a.layout.editor.Dy() > 0 {
+		// Editor is rendered within the page's layout (SplitPaneLayout)
+		// No additional rendering needed here
+	}
+
+	// Draw status bar
 	if statusDrawable, ok := a.status.(interface {
 		Draw(scr uv.Screen, area uv.Rectangle) *tea.Cursor
 	}); ok {
@@ -844,11 +972,66 @@ func (a appModel) Draw(scr uv.Screen, area uv.Rectangle) *tea.Cursor {
 	return nil
 }
 
+// renderHeaderView renders the header for onboarding/initialize/landing states.
+func (a appModel) renderHeaderView(width int) string {
+	return chat.Header(width)
+}
+
+// renderCompactHeaderView renders the compact header for chat state.
+func (a appModel) renderCompactHeaderView(width int) string {
+	return chat.Header(width)
+}
+
+// renderSessionDetailsView renders the session details in compact mode.
+func (a appModel) renderSessionDetailsView(width int) string {
+	if a.selectedSession.ID == "" {
+		return ""
+	}
+
+	t := theme.CurrentTheme()
+	baseStyle := styles.BaseStyle()
+
+	title := baseStyle.
+		Foreground(lipgloss.Color(t.Primary())).
+		Bold(true).
+		Width(width).
+		Render(a.selectedSession.Title)
+
+	modelInfo := fmt.Sprintf("Model: %s", config.Get().Agents[config.AgentCoder].Model)
+	modelLine := baseStyle.
+		Foreground(lipgloss.Color(t.Text())).
+		Width(width).
+		Render(modelInfo)
+
+	tokensInfo := fmt.Sprintf("Tokens: %d / %d",
+		a.selectedSession.PromptTokens+a.selectedSession.CompletionTokens,
+		0) // TODO: get context window from model
+	tokensLine := baseStyle.
+		Foreground(lipgloss.Color(t.TextMuted())).
+		Width(width).
+		Render(tokensInfo)
+
+	return baseStyle.
+		Border(lipgloss.RoundedBorder()).
+		BorderForeground(lipgloss.Color(t.BorderNormal())).
+		Width(width).
+		Render(
+			lipgloss.JoinVertical(
+				lipgloss.Left,
+				title,
+				"",
+				modelLine,
+				tokensLine,
+			),
+		)
+}
+
 func (a appModel) View() tea.View {
 	var v tea.View
 	v.AltScreen = true
 	v.MouseMode = tea.MouseModeCellMotion
 	v.ReportFocus = true
+	v.WindowTitle = "vividcode " + config.WorkingDirectory()
 
 	width := a.width
 	height := a.height
@@ -879,10 +1062,12 @@ func (a appModel) View() tea.View {
 }
 
 func New(app *app.App) tea.Model {
-	startPage := page.ChatPage
+	// Determine initial UI state based on configuration
+	startState := determineInitialState(app)
 
 	model := &appModel{
-		currentPage:   startPage,
+		state:         startState,
+		currentPage:   page.ChatPage, // Keep for legacy support
 		loadedPages:   make(map[page.PageID]bool),
 		status:        core.NewStatusCmp(app.LSPClients),
 		help:          dialog.NewHelpCmp(),
@@ -899,8 +1084,8 @@ func New(app *app.App) tea.Model {
 			page.ChatPage: page.NewChatPage(app),
 			page.LogsPage: page.NewLogsPage(),
 		},
-		filepicker: dialog.NewFilepickerCmp(app),
-		dialog:     render.NewOverlay(),
+		filepicker:    dialog.NewFilepickerCmp(app),
+		dialogOverlay: render.NewOverlay(),
 	}
 
 	model.RegisterCommand(dialog.Command{
@@ -933,6 +1118,7 @@ If there are Cursor rules (in .cursor/rules/ or .cursorrules) or Copilot rules (
 			}
 		},
 	})
+
 	// Load custom commands
 	customCommands, err := dialog.LoadCustomCommands()
 	if err != nil {
@@ -944,4 +1130,31 @@ If there are Cursor rules (in .cursor/rules/ or .cursorrules) or Copilot rules (
 	}
 
 	return model
+}
+
+// determineInitialState determines the initial UI state based on configuration.
+func determineInitialState(app *app.App) uiState {
+	cfg := config.Get()
+
+	// Check if any provider has API key configured
+	hasAPIKey := false
+	for _, provider := range cfg.Providers {
+		if !provider.Disabled && provider.APIKey != "" {
+			hasAPIKey = true
+			break
+		}
+	}
+
+	if !hasAPIKey {
+		return uiOnboarding
+	}
+
+	// Check if project needs initialization
+	needsInit, err := config.ShouldShowInitDialog()
+	if err == nil && needsInit {
+		return uiInitialize
+	}
+
+	// Default to chat state (user can create sessions)
+	return uiChat
 }

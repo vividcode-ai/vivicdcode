@@ -92,7 +92,7 @@ func (m *sidebarCmp) View() tea.View {
 		Render(
 			lipgloss.JoinVertical(
 				lipgloss.Top,
-				header(m.width),
+				Header(m.width),
 				" ",
 				m.sessionSection(),
 				" ",

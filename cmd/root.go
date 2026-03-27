@@ -3,6 +3,7 @@ package cmd
 import (
 	"context"
 	"fmt"
+	"log"
 	"os"
 	"sync"
 	"time"
@@ -112,6 +113,19 @@ to assist developers in writing, debugging, and understanding code directly from
 			// Run non-interactive flow using the App method
 			return app.RunNonInteractive(ctx, prompt, outputFormat, quiet)
 		}
+
+		//-------------------------------------------
+		// 设置日志（每次启动清空文件）
+		logFile, err := setupLogging()
+		if err != nil {
+			fmt.Printf("日志初始化失败: %v\n", err)
+			os.Exit(1)
+		}
+		if logFile != nil {
+			defer logFile.Close()
+		}
+		log.Println("调试日志已启用----")
+		//-------------------------------------------
 
 		// Interactive mode
 		// Set up the TUI
@@ -305,4 +319,27 @@ func init() {
 	rootCmd.RegisterFlagCompletionFunc("output-format", func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
 		return format.SupportedFormats, cobra.ShellCompDirectiveNoFileComp
 	})
+}
+
+// setupLogging 配置日志输出：如果 DEBUG 环境变量非空，则输出到 debug.log，并清空已有内容
+func setupLogging() (*os.File, error) {
+
+	logFile := "debug.log"
+
+	// 先清空文件（如果存在则截断，不存在则创建）
+	file, err := os.OpenFile(logFile, os.O_RDWR|os.O_CREATE|os.O_TRUNC, 0666)
+	if err != nil {
+		return nil, fmt.Errorf("无法清空日志文件: %w", err)
+	}
+	// 关闭这个临时文件句柄，因为 tea.LogToFile 会重新打开
+	file.Close()
+
+	// 使用 tea.LogToFile 打开文件（追加模式）
+	f, err := tea.LogToFile(logFile, "demo")
+	if err != nil {
+		return nil, err
+	}
+
+	log.Println("调试日志已启用，文件已清空")
+	return f, nil
 }

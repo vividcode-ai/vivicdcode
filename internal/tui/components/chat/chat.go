@@ -25,7 +25,7 @@ type SessionClearedMsg struct{}
 
 type EditorFocusMsg bool
 
-func header(width int) string {
+func Header(width int) string {
 	return lipgloss.JoinVertical(
 		lipgloss.Top,
 		logo(width),
