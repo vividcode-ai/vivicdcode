@@ -1,6 +1,8 @@
 package layout
 
 import (
+	"strings"
+
 	"charm.land/bubbles/v2/key"
 	tea "charm.land/bubbletea/v2"
 	"charm.land/lipgloss/v2"
@@ -29,9 +31,10 @@ type splitPaneLayout struct {
 	ratio         float64
 	verticalRatio float64
 
-	rightPanel  Container
-	leftPanel   Container
-	bottomPanel Container
+	rightPanel             Container
+	leftPanel              Container
+	bottomPanel            Container
+	bottomPanelFixedHeight int
 }
 
 type SplitPaneOption func(*splitPaneLayout)
@@ -89,8 +92,9 @@ func (s *splitPaneLayout) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 }
 
 func (s *splitPaneLayout) View() tea.View {
-	var topSection string
+	t := theme.CurrentTheme()
 
+	var topSection string
 	if s.leftPanel != nil && s.rightPanel != nil {
 		leftView := s.leftPanel.View()
 		rightView := s.rightPanel.View()
@@ -104,7 +108,6 @@ func (s *splitPaneLayout) View() tea.View {
 	}
 
 	var finalView string
-
 	if s.bottomPanel != nil && topSection != "" {
 		bottomView := s.bottomPanel.View()
 		finalView = lipgloss.JoinVertical(lipgloss.Left, topSection, bottomView.Content)
@@ -114,18 +117,24 @@ func (s *splitPaneLayout) View() tea.View {
 		finalView = topSection
 	}
 
-	if finalView != "" {
-		t := theme.CurrentTheme()
-
-		style := lipgloss.NewStyle().
-			Width(s.width).
-			Height(s.height).
-			Background(lipgloss.Color(t.Background()))
-
-		return tea.View{Content: style.Render(finalView)}
+	if finalView == "" {
+		finalView = strings.Repeat(" ", s.width)
 	}
 
-	return tea.View{Content: finalView}
+	currentHeight := lipgloss.Height(finalView)
+	if currentHeight < s.height {
+		fillLine := strings.Repeat(" ", s.width)
+		for i := currentHeight; i < s.height; i++ {
+			finalView += "\n" + fillLine
+		}
+	}
+
+	style := lipgloss.NewStyle().
+		Width(s.width).
+		Height(s.height).
+		Background(lipgloss.Color(t.Background()))
+
+	return tea.View{Content: style.Render(finalView)}
 }
 
 func (s *splitPaneLayout) SetSize(width, height int) tea.Cmd {
@@ -134,8 +143,13 @@ func (s *splitPaneLayout) SetSize(width, height int) tea.Cmd {
 
 	var topHeight, bottomHeight int
 	if s.bottomPanel != nil {
-		topHeight = int(float64(height) * s.verticalRatio)
-		bottomHeight = height - topHeight
+		if s.bottomPanelFixedHeight > 0 {
+			bottomHeight = s.bottomPanelFixedHeight
+			topHeight = height - bottomHeight
+		} else {
+			topHeight = int(float64(height) * s.verticalRatio)
+			bottomHeight = height - topHeight
+		}
 	} else {
 		topHeight = height
 		bottomHeight = 0
@@ -246,6 +260,9 @@ func (s *splitPaneLayout) BindingKeys() []key.Binding {
 func (s *splitPaneLayout) Draw(scr uv.Screen, area uv.Rectangle) *tea.Cursor {
 	view := s.View().Content
 	uv.NewStyledString(view).Draw(scr, area)
+
+	// Debug: Check actual drawing area
+	_ = area // area is the rect we're drawing into
 	return nil
 }
 
@@ -288,5 +305,12 @@ func WithBottomPanel(panel Container) SplitPaneOption {
 func WithVerticalRatio(ratio float64) SplitPaneOption {
 	return func(s *splitPaneLayout) {
 		s.verticalRatio = ratio
+	}
+}
+
+func WithBottomPanelFixed(panel Container, fixedHeight int) SplitPaneOption {
+	return func(s *splitPaneLayout) {
+		s.bottomPanel = panel
+		s.bottomPanelFixedHeight = fixedHeight
 	}
 }

@@ -215,7 +215,12 @@ func (p *chatPage) BindingKeys() []key.Binding {
 
 func (p *chatPage) Draw(scr uv.Screen, area uv.Rectangle) *tea.Cursor {
 	p.layout.Draw(scr, area)
-	return nil
+	// Return cursor from editor if focused
+	cur := p.editor.GetCursor()
+	if cur.X == 0 && cur.Y == 0 {
+		return nil
+	}
+	return &cur
 }
 
 func NewChatPage(app *app.App) tea.Model {
@@ -237,7 +242,7 @@ func NewChatPage(app *app.App) tea.Model {
 		completionDialog: completionDialog,
 		layout: layout.NewSplitPane(
 			layout.WithLeftPanel(messagesContainer),
-			layout.WithBottomPanel(editorContainer),
+			layout.WithBottomPanelFixed(editorContainer, 5),
 		),
 	}
 }

@@ -124,7 +124,7 @@ func (q *quitDialogCmp) View() tea.View {
 		Border(lipgloss.RoundedBorder()).
 		BorderBackground(lipgloss.Color(t.Background())).
 		BorderForeground(lipgloss.Color(t.TextMuted())).
-		Width(lipgloss.Width(content) + 4).
+		Width(lipgloss.Width(content) + 6).
 		Render(content)}
 }
 

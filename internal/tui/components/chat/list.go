@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"math"
+	"strings"
 
 	"charm.land/bubbles/v2/key"
 	"charm.land/bubbles/v2/spinner"
@@ -265,8 +266,9 @@ func (m *messagesCmp) renderView() {
 func (m *messagesCmp) View() tea.View {
 	baseStyle := styles.BaseStyle()
 
+	var content string
 	if m.rendering {
-		return tea.View{Content: baseStyle.
+		content = baseStyle.
 			Width(m.width).
 			Render(
 				lipgloss.JoinVertical(
@@ -275,38 +277,47 @@ func (m *messagesCmp) View() tea.View {
 					m.working(),
 					m.help(),
 				),
-			)}
-	}
-	if len(m.messages) == 0 {
-		content := baseStyle.
+			)
+	} else if len(m.messages) == 0 {
+		innerContent := baseStyle.
 			Width(m.width).
 			Height(m.height - 1).
 			Render(
 				m.initialScreen(),
 			)
 
-		return tea.View{Content: baseStyle.
+		content = baseStyle.
 			Width(m.width).
 			Render(
 				lipgloss.JoinVertical(
 					lipgloss.Top,
-					content,
+					innerContent,
 					"",
 					m.help(),
 				),
-			)}
+			)
+	} else {
+		content = baseStyle.
+			Width(m.width).
+			Render(
+				lipgloss.JoinVertical(
+					lipgloss.Top,
+					m.viewport.View(),
+					m.working(),
+					m.help(),
+				),
+			)
 	}
 
-	return tea.View{Content: baseStyle.
-		Width(m.width).
-		Render(
-			lipgloss.JoinVertical(
-				lipgloss.Top,
-				m.viewport.View(),
-				m.working(),
-				m.help(),
-			),
-		)}
+	actualHeight := lipgloss.Height(content)
+	if actualHeight < m.height {
+		fillLine := strings.Repeat(" ", m.width)
+		for i := actualHeight; i < m.height; i++ {
+			content += "\n" + fillLine
+		}
+	}
+
+	return tea.View{Content: content}
 }
 
 func hasToolsWithoutResponse(messages []message.Message) bool {

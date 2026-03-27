@@ -222,27 +222,38 @@ func (m *editorCmp) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 func (m *editorCmp) View() tea.View {
 	t := theme.CurrentTheme()
 
-	// Style the prompt with theme colors
 	style := lipgloss.NewStyle().
 		Padding(0, 0, 0, 1).
 		Bold(true).
 		Foreground(lipgloss.Color(t.Primary()))
 
+	var content string
 	if len(m.attachments) == 0 {
-		return tea.View{Content: lipgloss.JoinHorizontal(lipgloss.Top, style.Render(">"), m.textarea.View())}
+		content = lipgloss.JoinHorizontal(lipgloss.Top, style.Render(">"), m.textarea.View())
+	} else {
+		m.textarea.SetHeight(m.height - 1)
+		content = lipgloss.JoinVertical(lipgloss.Top,
+			m.attachmentsContent(),
+			lipgloss.JoinHorizontal(lipgloss.Top, style.Render(">"),
+				m.textarea.View()),
+		)
 	}
-	m.textarea.SetHeight(m.height - 1)
-	return tea.View{Content: lipgloss.JoinVertical(lipgloss.Top,
-		m.attachmentsContent(),
-		lipgloss.JoinHorizontal(lipgloss.Top, style.Render(">"),
-			m.textarea.View()),
-	)}
+
+	actualHeight := lipgloss.Height(content)
+	if actualHeight < m.height {
+		fillLine := strings.Repeat(" ", m.width)
+		for i := actualHeight; i < m.height; i++ {
+			content += "\n" + fillLine
+		}
+	}
+
+	return tea.View{Content: content}
 }
 
 func (m *editorCmp) SetSize(width, height int) tea.Cmd {
 	m.width = width
 	m.height = height
-	m.textarea.SetWidth(width - 3) // account for the prompt and padding right
+	//m.textarea.SetWidth(width - 3) // account for the prompt and padding right
 	m.textarea.SetHeight(height)
 	m.textarea.SetWidth(width)
 	return nil
@@ -250,6 +261,19 @@ func (m *editorCmp) SetSize(width, height int) tea.Cmd {
 
 func (m *editorCmp) GetSize() (int, int) {
 	return m.textarea.Width(), m.textarea.Height()
+}
+
+func (m *editorCmp) GetCursor() tea.Cursor {
+	if !m.textarea.Focused() {
+		return tea.Cursor{}
+	}
+	cur := m.textarea.Cursor()
+	if cur == nil {
+		return tea.Cursor{}
+	}
+	cur.X++ // Adjust for app margins
+	cur.Y++ // Adjust for container top border
+	return *cur
 }
 
 func (m *editorCmp) attachmentsContent() string {

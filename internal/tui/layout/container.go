@@ -13,6 +13,7 @@ type Container interface {
 	Sizeable
 	Bindings
 	Draw(scr uv.Screen, area uv.Rectangle) *tea.Cursor
+	GetCursor() tea.Cursor
 }
 type container struct {
 	width  int
@@ -127,6 +128,14 @@ func (c *container) Draw(scr uv.Screen, area uv.Rectangle) *tea.Cursor {
 	view := c.View().Content
 	uv.NewStyledString(view).Draw(scr, area)
 	return nil
+}
+
+func (c *container) GetCursor() tea.Cursor {
+	// Delegate to content if it has cursor capability
+	if cursorModel, ok := c.content.(interface{ GetCursor() tea.Cursor }); ok {
+		return cursorModel.GetCursor()
+	}
+	return tea.Cursor{}
 }
 
 type ContainerOption func(*container)

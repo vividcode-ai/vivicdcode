@@ -98,6 +98,16 @@ var logsKeyReturnKey = key.NewBinding(
 	key.WithHelp("esc/q", "go back"),
 )
 
+// FocusState represents the current focus state of the UI.
+type FocusState uint8
+
+// Possible FocusState values.
+const (
+	FocusNone FocusState = iota
+	FocusEditor
+	FocusMain
+)
+
 type uiLayout struct {
 	area   uv.Rectangle
 	main   uv.Rectangle
@@ -152,7 +162,7 @@ type appModel struct {
 
 	layout uiLayout
 
-	focusedComponent string
+	focusState FocusState
 
 	dialog *render.Overlay
 
@@ -742,11 +752,9 @@ func (a appModel) generateLayout(w, h int) uiLayout {
 	editorHeight := 5
 	statusHeight := 1
 
-	mainHeight := h - editorHeight - statusHeight
-
-	mainRect := image.Rect(1, 1, w-1, mainHeight)
-	editorRect := image.Rect(1, mainHeight, w-1, mainHeight+editorHeight)
-	statusRect := image.Rect(0, mainHeight+editorHeight, w, h)
+	mainRect := image.Rect(0, 0, w, h-editorHeight-statusHeight)
+	editorRect := image.Rect(0, mainRect.Max.Y, w, mainRect.Max.Y+editorHeight)
+	statusRect := image.Rect(0, h-statusHeight, w, h)
 
 	return uiLayout{
 		area:   area,
@@ -774,10 +782,11 @@ func (a appModel) Draw(scr uv.Screen, area uv.Rectangle) *tea.Cursor {
 
 	screen.Clear(scr)
 
+	var mainCursor *tea.Cursor
 	if drawable, ok := a.pages[a.currentPage].(interface {
 		Draw(scr uv.Screen, area uv.Rectangle) *tea.Cursor
 	}); ok {
-		drawable.Draw(scr, a.layout.main)
+		mainCursor = drawable.Draw(scr, a.layout.main)
 	} else {
 		mainContent := a.pages[a.currentPage].View().Content
 		uv.NewStyledString(mainContent).Draw(scr, a.layout.main)
@@ -792,37 +801,46 @@ func (a appModel) Draw(scr uv.Screen, area uv.Rectangle) *tea.Cursor {
 		uv.NewStyledString(statusContent).Draw(scr, a.layout.status)
 	}
 
+	// Dialog cursor (dialogs take precedence over main cursor)
+	var dialogCursor *tea.Cursor
 	if a.showHelp {
-		a.help.Draw(scr, area)
+		dialogCursor = a.help.Draw(scr, area)
 	}
 	if a.showQuit {
-		a.quit.Draw(scr, area)
+		dialogCursor = a.quit.Draw(scr, area)
 	}
 	if a.showSessionDialog {
-		a.sessionDialog.Draw(scr, area)
+		dialogCursor = a.sessionDialog.Draw(scr, area)
 	}
 	if a.showCommandDialog {
-		a.commandDialog.Draw(scr, area)
+		dialogCursor = a.commandDialog.Draw(scr, area)
 	}
 	if a.showModelDialog {
-		a.modelDialog.Draw(scr, area)
+		dialogCursor = a.modelDialog.Draw(scr, area)
 	}
 	if a.showInitDialog {
-		a.initDialog.Draw(scr, area)
+		dialogCursor = a.initDialog.Draw(scr, area)
 	}
 	if a.showThemeDialog {
-		a.themeDialog.Draw(scr, area)
+		dialogCursor = a.themeDialog.Draw(scr, area)
 	}
 	if a.showPermissions {
-		a.permissions.Draw(scr, area)
+		dialogCursor = a.permissions.Draw(scr, area)
 	}
 	if a.showFilepicker {
-		a.filepicker.Draw(scr, area)
+		dialogCursor = a.filepicker.Draw(scr, area)
 	}
 	if a.showMultiArgumentsDialog {
-		a.multiArgumentsDialog.Draw(scr, area)
+		dialogCursor = a.multiArgumentsDialog.Draw(scr, area)
 	}
 
+	// Dialogs take precedence; otherwise return main cursor
+	if dialogCursor != nil {
+		return dialogCursor
+	}
+	if mainCursor != nil {
+		return mainCursor
+	}
 	return nil
 }
 
