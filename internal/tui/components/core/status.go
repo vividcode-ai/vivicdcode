@@ -39,11 +39,11 @@ func (m statusCmp) clearMessageCmd(ttl time.Duration) tea.Cmd {
 	})
 }
 
-func (m statusCmp) Init() tea.Cmd {
+func (m *statusCmp) Init() tea.Cmd {
 	return nil
 }
 
-func (m statusCmp) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
+func (m *statusCmp) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	switch msg := msg.(type) {
 	case tea.WindowSizeMsg:
 		m.width = msg.Width
@@ -117,7 +117,7 @@ func formatTokensAndCost(tokens, contextWindow int64, cost float64) string {
 	return fmt.Sprintf("Context: %s, Cost: %s", formattedTokens, formattedCost)
 }
 
-func (m statusCmp) View() tea.View {
+func (m *statusCmp) View() tea.View {
 	t := theme.CurrentTheme()
 	modelID := config.Get().Agents[config.AgentCoder].Model
 	model := models.SupportedModels[modelID]
@@ -259,7 +259,7 @@ func (m *statusCmp) projectDiagnostics() string {
 	return strings.Join(diagnostics, " ")
 }
 
-func (m statusCmp) availableFooterMsgWidth(diagnostics, tokenInfo string) int {
+func (m *statusCmp) availableFooterMsgWidth(diagnostics, tokenInfo string) int {
 	tokensWidth := 0
 	if m.session.ID != "" {
 		tokensWidth = lipgloss.Width(tokenInfo) + 2
@@ -267,7 +267,7 @@ func (m statusCmp) availableFooterMsgWidth(diagnostics, tokenInfo string) int {
 	return max(0, m.width-lipgloss.Width(helpWidget)-lipgloss.Width(m.model())-lipgloss.Width(diagnostics)-tokensWidth)
 }
 
-func (m statusCmp) model() string {
+func (m *statusCmp) model() string {
 	t := theme.CurrentTheme()
 
 	cfg := config.Get()
@@ -284,7 +284,7 @@ func (m statusCmp) model() string {
 		Render(model.Name)
 }
 
-func (m statusCmp) SetWidth(width int) {
+func (m *statusCmp) SetWidth(width int) {
 	m.width = width
 }
 

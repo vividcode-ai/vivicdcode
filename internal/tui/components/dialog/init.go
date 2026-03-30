@@ -20,8 +20,8 @@ type InitDialogCmp struct {
 }
 
 // NewInitDialogCmp creates a new InitDialogCmp.
-func NewInitDialogCmp() InitDialogCmp {
-	return InitDialogCmp{
+func NewInitDialogCmp() *InitDialogCmp {
+	return &InitDialogCmp{
 		selected: 0,
 		keys:     initDialogKeyMap{},
 	}
@@ -65,12 +65,12 @@ func (k initDialogKeyMap) FullHelp() [][]key.Binding {
 }
 
 // Init implements tea.Model.
-func (m InitDialogCmp) Init() tea.Cmd {
+func (m *InitDialogCmp) Init() tea.Cmd {
 	return nil
 }
 
 // Update implements tea.Model.
-func (m InitDialogCmp) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
+func (m *InitDialogCmp) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	switch msg := msg.(type) {
 	case tea.KeyMsg:
 		switch {
@@ -94,7 +94,7 @@ func (m InitDialogCmp) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 }
 
 // View implements tea.Model.
-func (m InitDialogCmp) View() tea.View {
+func (m *InitDialogCmp) View() tea.View {
 	t := theme.CurrentTheme()
 	baseStyle := styles.BaseStyle()
 
@@ -169,7 +169,7 @@ func (m InitDialogCmp) View() tea.View {
 		Render(content)}
 }
 
-func (m InitDialogCmp) Draw(scr uv.Screen, area uv.Rectangle) *tea.Cursor {
+func (m *InitDialogCmp) Draw(scr uv.Screen, area uv.Rectangle) *tea.Cursor {
 	view := m.View().Content
 	render.DrawCenter(scr, area, view)
 	return nil
@@ -182,7 +182,7 @@ func (m *InitDialogCmp) SetSize(width, height int) {
 }
 
 // Bindings implements layout.Bindings.
-func (m InitDialogCmp) Bindings() []key.Binding {
+func (m *InitDialogCmp) Bindings() []key.Binding {
 	return m.keys.ShortHelp()
 }
 

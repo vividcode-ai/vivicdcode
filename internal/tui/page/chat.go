@@ -180,6 +180,12 @@ func (p *chatPage) SetSize(width, height int) tea.Cmd {
 	return p.layout.SetSize(width, height)
 }
 
+func (p *chatPage) ScrollBy(lines int) {
+	if scroller, ok := p.layout.(interface{ ScrollBy(lines int) }); ok {
+		scroller.ScrollBy(lines)
+	}
+}
+
 func (p *chatPage) GetSize() (int, int) {
 	return p.layout.GetSize()
 }

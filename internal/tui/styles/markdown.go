@@ -1,6 +1,8 @@
 package styles
 
 import (
+	"sync"
+
 	"charm.land/glamour/v2"
 	"charm.land/glamour/v2/ansi"
 	"github.com/vividcode-ai/vividcode/internal/tui/theme"
@@ -12,12 +14,38 @@ func boolPtr(b bool) *bool       { return &b }
 func stringPtr(s string) *string { return &s }
 func uintPtr(u uint) *uint       { return &u }
 
+var (
+	mdRendererMu    sync.RWMutex
+	mdRendererCache map[int]*glamour.TermRenderer = make(map[int]*glamour.TermRenderer)
+)
+
 func GetMarkdownRenderer(width int) *glamour.TermRenderer {
+	mdRendererMu.RLock()
+	if r, ok := mdRendererCache[width]; ok {
+		mdRendererMu.RUnlock()
+		return r
+	}
+	mdRendererMu.RUnlock()
+
+	mdRendererMu.Lock()
+	defer mdRendererMu.Unlock()
+
+	if r, ok := mdRendererCache[width]; ok {
+		return r
+	}
+
 	r, _ := glamour.NewTermRenderer(
 		glamour.WithStyles(generateMarkdownStyleConfig()),
 		glamour.WithWordWrap(width),
 	)
+	mdRendererCache[width] = r
 	return r
+}
+
+func ClearMarkdownCache() {
+	mdRendererMu.Lock()
+	defer mdRendererMu.Unlock()
+	mdRendererCache = make(map[int]*glamour.TermRenderer)
 }
 
 func generateMarkdownStyleConfig() ansi.StyleConfig {

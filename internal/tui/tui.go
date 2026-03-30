@@ -4,7 +4,6 @@ import (
 	"context"
 	"fmt"
 	"image"
-	"log"
 	"math/rand"
 	"strings"
 
@@ -180,7 +179,7 @@ type appModel struct {
 	modelDialog     dialog.ModelDialog
 
 	showInitDialog bool
-	initDialog     dialog.InitDialogCmp
+	initDialog     *dialog.InitDialogCmp
 
 	showFilepicker bool
 	filepicker     dialog.FilepickerCmp
@@ -189,7 +188,7 @@ type appModel struct {
 	themeDialog     dialog.ThemeDialog
 
 	showMultiArgumentsDialog bool
-	multiArgumentsDialog     dialog.MultiArgumentsDialogCmp
+	multiArgumentsDialog     *dialog.MultiArgumentsDialogCmp
 
 	// Dialog management - unified overlay for all dialogs
 	dialogOverlay *render.Overlay
@@ -207,7 +206,7 @@ type appModel struct {
 	notifyWindowFocused bool
 }
 
-func (a appModel) Init() tea.Cmd {
+func (a *appModel) Init() tea.Cmd {
 	var cmds []tea.Cmd
 	cmd := a.pages[a.currentPage].Init()
 	a.loadedPages[a.currentPage] = true
@@ -246,12 +245,12 @@ func (a appModel) Init() tea.Cmd {
 	return tea.Batch(cmds...)
 }
 
-func (a appModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
+func (a *appModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	var cmds []tea.Cmd
 	var cmd tea.Cmd
 	switch msg := msg.(type) {
 	case tea.WindowSizeMsg:
-		log.Printf("Width:%d,Height:%d", msg.Width, msg.Height)
+		//log.Printf("Width:%d,Height:%d", msg.Width, msg.Height)
 		msg.Height -= 1 // Make space for the status bar
 		a.width, a.height = msg.Width, msg.Height
 
@@ -296,7 +295,7 @@ func (a appModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		if a.showMultiArgumentsDialog {
 			a.multiArgumentsDialog.SetSize(msg.Width, msg.Height)
 			args, argsCmd := a.multiArgumentsDialog.Update(msg)
-			a.multiArgumentsDialog = args.(dialog.MultiArgumentsDialogCmp)
+			a.multiArgumentsDialog = args.(*dialog.MultiArgumentsDialogCmp)
 			cmds = append(cmds, argsCmd, a.multiArgumentsDialog.Init())
 		}
 
@@ -308,15 +307,21 @@ func (a appModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case tea.MouseClickMsg:
 		cmds = append(cmds, func() tea.Msg { return msg })
 	case tea.MouseMotionMsg:
-		if render.MouseEventFilter(a, msg) == nil {
-			return a, nil
-		}
+		cmds = append(cmds, func() tea.Msg { return msg })
 	case tea.MouseWheelMsg:
-		if render.MouseEventFilter(a, msg) == nil {
-			return a, nil
+		if a.currentPage == page.ChatPage {
+			if scroller, ok := a.pages[a.currentPage].(interface {
+				ScrollBy(lines int)
+			}); ok {
+				switch msg.Button {
+				case tea.MouseWheelUp:
+					scroller.ScrollBy(-5)
+				case tea.MouseWheelDown:
+					scroller.ScrollBy(5)
+				}
+			}
 		}
-
-	// Status
+		return a, nil
 	case util.InfoMsg:
 		s, cmd := a.status.Update(msg)
 		a.status = s.(core.StatusCmp)
@@ -540,7 +545,7 @@ func (a appModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		// If multi-arguments dialog is open, let it handle the key press first
 		if a.showMultiArgumentsDialog {
 			args, cmd := a.multiArgumentsDialog.Update(msg)
-			a.multiArgumentsDialog = args.(dialog.MultiArgumentsDialogCmp)
+			a.multiArgumentsDialog = args.(*dialog.MultiArgumentsDialogCmp)
 			return a, cmd
 		}
 
@@ -732,7 +737,7 @@ func (a appModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 	if a.showInitDialog {
 		d, initCmd := a.initDialog.Update(msg)
-		a.initDialog = d.(dialog.InitDialogCmp)
+		a.initDialog = d.(*dialog.InitDialogCmp)
 		cmds = append(cmds, initCmd)
 		// Only block key messages send all other messages down
 		if _, ok := msg.(tea.KeyMsg); ok {
@@ -793,7 +798,7 @@ func (a *appModel) moveToPage(pageID page.PageID) tea.Cmd {
 	return tea.Batch(cmds...)
 }
 
-func (a appModel) generateLayout(w, h int) uiLayout {
+func (a *appModel) generateLayout(w, h int) uiLayout {
 	area := image.Rect(0, 0, w, h)
 
 	helpHeight := 1
@@ -860,7 +865,7 @@ func (a *appModel) updateSize() {
 	}
 }
 
-func (a appModel) Draw(scr uv.Screen, area uv.Rectangle) *tea.Cursor {
+func (a *appModel) Draw(scr uv.Screen, area uv.Rectangle) *tea.Cursor {
 	uiLayout := a.generateLayout(area.Dx(), area.Dy())
 
 	if a.layout != uiLayout {
@@ -973,17 +978,17 @@ func (a appModel) Draw(scr uv.Screen, area uv.Rectangle) *tea.Cursor {
 }
 
 // renderHeaderView renders the header for onboarding/initialize/landing states.
-func (a appModel) renderHeaderView(width int) string {
+func (a *appModel) renderHeaderView(width int) string {
 	return chat.Header(width)
 }
 
 // renderCompactHeaderView renders the compact header for chat state.
-func (a appModel) renderCompactHeaderView(width int) string {
+func (a *appModel) renderCompactHeaderView(width int) string {
 	return chat.Header(width)
 }
 
 // renderSessionDetailsView renders the session details in compact mode.
-func (a appModel) renderSessionDetailsView(width int) string {
+func (a *appModel) renderSessionDetailsView(width int) string {
 	if a.selectedSession.ID == "" {
 		return ""
 	}
@@ -1026,7 +1031,7 @@ func (a appModel) renderSessionDetailsView(width int) string {
 		)
 }
 
-func (a appModel) View() tea.View {
+func (a *appModel) View() tea.View {
 	var v tea.View
 	v.AltScreen = true
 	v.MouseMode = tea.MouseModeCellMotion

@@ -85,7 +85,7 @@ func applyInputStyles(ti *textinput.Model, t theme.Theme, focused bool) {
 }
 
 // NewMultiArgumentsDialogCmp creates a new MultiArgumentsDialogCmp.
-func NewMultiArgumentsDialogCmp(commandID, content string, argNames []string) MultiArgumentsDialogCmp {
+func NewMultiArgumentsDialogCmp(commandID, content string, argNames []string) *MultiArgumentsDialogCmp {
 	t := theme.CurrentTheme()
 	inputs := make([]textinput.Model, len(argNames))
 
@@ -105,7 +105,7 @@ func NewMultiArgumentsDialogCmp(commandID, content string, argNames []string) Mu
 		inputs[i] = ti
 	}
 
-	return MultiArgumentsDialogCmp{
+	return &MultiArgumentsDialogCmp{
 		inputs:     inputs,
 		keys:       argumentsDialogKeyMap{},
 		commandID:  commandID,
@@ -116,7 +116,7 @@ func NewMultiArgumentsDialogCmp(commandID, content string, argNames []string) Mu
 }
 
 // Init implements tea.Model.
-func (m MultiArgumentsDialogCmp) Init() tea.Cmd {
+func (m *MultiArgumentsDialogCmp) Init() tea.Cmd {
 	for i := range m.inputs {
 		if i == 0 {
 			m.inputs[i].Focus()
@@ -129,7 +129,7 @@ func (m MultiArgumentsDialogCmp) Init() tea.Cmd {
 }
 
 // Update implements tea.Model.
-func (m MultiArgumentsDialogCmp) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
+func (m *MultiArgumentsDialogCmp) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	var cmds []tea.Cmd
 	t := theme.CurrentTheme()
 
@@ -187,7 +187,7 @@ func (m MultiArgumentsDialogCmp) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 }
 
 // View implements tea.Model.
-func (m MultiArgumentsDialogCmp) View() tea.View {
+func (m *MultiArgumentsDialogCmp) View() tea.View {
 	t := theme.CurrentTheme()
 	baseStyle := styles.BaseStyle()
 
@@ -252,7 +252,7 @@ func (m MultiArgumentsDialogCmp) View() tea.View {
 		Render(content)}
 }
 
-func (m MultiArgumentsDialogCmp) Draw(scr uv.Screen, area uv.Rectangle) *tea.Cursor {
+func (m *MultiArgumentsDialogCmp) Draw(scr uv.Screen, area uv.Rectangle) *tea.Cursor {
 	view := m.View().Content
 	render.DrawCenter(scr, area, view)
 	return nil
@@ -265,6 +265,6 @@ func (m *MultiArgumentsDialogCmp) SetSize(width, height int) {
 }
 
 // Bindings implements layout.Bindings.
-func (m MultiArgumentsDialogCmp) Bindings() []key.Binding {
+func (m *MultiArgumentsDialogCmp) Bindings() []key.Binding {
 	return m.keys.ShortHelp()
 }

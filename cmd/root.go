@@ -18,6 +18,7 @@ import (
 	"github.com/vividcode-ai/vividcode/internal/logging"
 	"github.com/vividcode-ai/vividcode/internal/pubsub"
 	"github.com/vividcode-ai/vividcode/internal/tui"
+	"github.com/vividcode-ai/vividcode/internal/tui/render"
 	"github.com/vividcode-ai/vividcode/internal/version"
 )
 
@@ -133,6 +134,7 @@ to assist developers in writing, debugging, and understanding code directly from
 		program := tea.NewProgram(
 			tuiModel,
 			tea.WithEnvironment(os.Environ()),
+			tea.WithFilter(render.MouseEventFilter),
 		)
 
 		// Setup the subscriptions, this will send services events to the TUI
