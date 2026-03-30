@@ -5,10 +5,10 @@ import (
 	"strings"
 	"time"
 
-	"github.com/charmbracelet/bubbles/key"
-	"github.com/charmbracelet/bubbles/viewport"
-	tea "github.com/charmbracelet/bubbletea"
-	"github.com/charmbracelet/lipgloss"
+	"charm.land/bubbles/v2/key"
+	"charm.land/bubbles/v2/viewport"
+	tea "charm.land/bubbletea/v2"
+	"charm.land/lipgloss/v2"
 	"github.com/vividcode-ai/vividcode/internal/logging"
 	"github.com/vividcode-ai/vividcode/internal/tui/layout"
 	"github.com/vividcode-ai/vividcode/internal/tui/styles"
@@ -53,7 +53,7 @@ func (i *detailCmp) updateContent() {
 	t := theme.CurrentTheme()
 
 	// Format the header with timestamp and level
-	timeStyle := lipgloss.NewStyle().Foreground(t.TextMuted())
+	timeStyle := lipgloss.NewStyle().Foreground(lipgloss.Color(t.TextMuted()))
 	levelStyle := getLevelStyle(i.currentLog.Level)
 
 	header := lipgloss.JoinHorizontal(
@@ -67,7 +67,7 @@ func (i *detailCmp) updateContent() {
 	content.WriteString("\n\n")
 
 	// Message with styling
-	messageStyle := lipgloss.NewStyle().Bold(true).Foreground(t.Text())
+	messageStyle := lipgloss.NewStyle().Bold(true).Foreground(lipgloss.Color(t.Text()))
 	content.WriteString(messageStyle.Render("Message:"))
 	content.WriteString("\n")
 	content.WriteString(lipgloss.NewStyle().Padding(0, 2).Render(i.currentLog.Message))
@@ -75,13 +75,13 @@ func (i *detailCmp) updateContent() {
 
 	// Attributes section
 	if len(i.currentLog.Attributes) > 0 {
-		attrHeaderStyle := lipgloss.NewStyle().Bold(true).Foreground(t.Text())
+		attrHeaderStyle := lipgloss.NewStyle().Bold(true).Foreground(lipgloss.Color(t.Text()))
 		content.WriteString(attrHeaderStyle.Render("Attributes:"))
 		content.WriteString("\n")
 
 		// Create a table-like display for attributes
-		keyStyle := lipgloss.NewStyle().Foreground(t.Primary()).Bold(true)
-		valueStyle := lipgloss.NewStyle().Foreground(t.Text())
+		keyStyle := lipgloss.NewStyle().Foreground(lipgloss.Color(t.Primary())).Bold(true)
+		valueStyle := lipgloss.NewStyle().Foreground(lipgloss.Color(t.Text()))
 
 		for _, attr := range i.currentLog.Attributes {
 			attrLine := fmt.Sprintf("%s: %s",
@@ -99,24 +99,24 @@ func (i *detailCmp) updateContent() {
 func getLevelStyle(level string) lipgloss.Style {
 	style := lipgloss.NewStyle().Bold(true)
 	t := theme.CurrentTheme()
-	
+
 	switch strings.ToLower(level) {
 	case "info":
-		return style.Foreground(t.Info())
+		return style.Foreground(lipgloss.Color(t.Info()))
 	case "warn", "warning":
-		return style.Foreground(t.Warning())
+		return style.Foreground(lipgloss.Color(t.Warning()))
 	case "error", "err":
-		return style.Foreground(t.Error())
+		return style.Foreground(lipgloss.Color(t.Error()))
 	case "debug":
-		return style.Foreground(t.Success())
+		return style.Foreground(lipgloss.Color(t.Success()))
 	default:
-		return style.Foreground(t.Text())
+		return style.Foreground(lipgloss.Color(t.Text()))
 	}
 }
 
-func (i *detailCmp) View() string {
+func (i *detailCmp) View() tea.View {
 	t := theme.CurrentTheme()
-	return styles.ForceReplaceBackgroundWithLipgloss(i.viewport.View(), t.Background())
+	return tea.View{Content: styles.ForceReplaceBackgroundWithLipgloss(i.viewport.View(), lipgloss.Color(t.Background()))}
 }
 
 func (i *detailCmp) GetSize() (int, int) {
@@ -126,8 +126,8 @@ func (i *detailCmp) GetSize() (int, int) {
 func (i *detailCmp) SetSize(width int, height int) tea.Cmd {
 	i.width = width
 	i.height = height
-	i.viewport.Width = i.width
-	i.viewport.Height = i.height
+	i.viewport.SetWidth(i.width)
+	i.viewport.SetHeight(i.height)
 	i.updateContent()
 	return nil
 }
@@ -138,6 +138,6 @@ func (i *detailCmp) BindingKeys() []key.Binding {
 
 func NewLogsDetails() DetailComponent {
 	return &detailCmp{
-		viewport: viewport.New(0, 0),
+		viewport: viewport.New(viewport.WithWidth(0), viewport.WithHeight(0)),
 	}
 }

@@ -1,10 +1,12 @@
 package dialog
 
 import (
-	"github.com/charmbracelet/bubbles/key"
-	tea "github.com/charmbracelet/bubbletea"
-	"github.com/charmbracelet/lipgloss"
+	"charm.land/bubbles/v2/key"
+	tea "charm.land/bubbletea/v2"
+	"charm.land/lipgloss/v2"
+	uv "github.com/charmbracelet/ultraviolet"
 	"github.com/vividcode-ai/vividcode/internal/tui/layout"
+	"github.com/vividcode-ai/vividcode/internal/tui/render"
 	"github.com/vividcode-ai/vividcode/internal/tui/styles"
 	"github.com/vividcode-ai/vividcode/internal/tui/theme"
 	"github.com/vividcode-ai/vividcode/internal/tui/util"
@@ -22,6 +24,7 @@ type CloseThemeDialogMsg struct{}
 type ThemeDialog interface {
 	tea.Model
 	layout.Bindings
+	Draw(scr uv.Screen, area uv.Rectangle) *tea.Cursor
 }
 
 type themeDialogCmp struct {
@@ -122,17 +125,17 @@ func (t *themeDialogCmp) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	return t, nil
 }
 
-func (t *themeDialogCmp) View() string {
+func (t *themeDialogCmp) View() tea.View {
 	currentTheme := theme.CurrentTheme()
 	baseStyle := styles.BaseStyle()
 
 	if len(t.themes) == 0 {
-		return baseStyle.Padding(1, 2).
+		return tea.View{Content: baseStyle.Padding(1, 2).
 			Border(lipgloss.RoundedBorder()).
-			BorderBackground(currentTheme.Background()).
-			BorderForeground(currentTheme.TextMuted()).
+			BorderBackground(lipgloss.Color(currentTheme.Background())).
+			BorderForeground(lipgloss.Color(currentTheme.TextMuted())).
 			Width(40).
-			Render("No themes available")
+			Render("No themes available")}
 	}
 
 	// Calculate max width needed for theme names
@@ -152,8 +155,8 @@ func (t *themeDialogCmp) View() string {
 
 		if i == t.selectedIdx {
 			itemStyle = itemStyle.
-				Background(currentTheme.Primary()).
-				Foreground(currentTheme.Background()).
+				Background(lipgloss.Color(currentTheme.Primary())).
+				Foreground(lipgloss.Color(currentTheme.Background())).
 				Bold(true)
 		}
 
@@ -161,7 +164,7 @@ func (t *themeDialogCmp) View() string {
 	}
 
 	title := baseStyle.
-		Foreground(currentTheme.Primary()).
+		Foreground(lipgloss.Color(currentTheme.Primary())).
 		Bold(true).
 		Width(maxWidth).
 		Padding(0, 1).
@@ -175,12 +178,18 @@ func (t *themeDialogCmp) View() string {
 		baseStyle.Width(maxWidth).Render(""),
 	)
 
-	return baseStyle.Padding(1, 2).
+	return tea.View{Content: baseStyle.Padding(1, 2).
 		Border(lipgloss.RoundedBorder()).
-		BorderBackground(currentTheme.Background()).
-		BorderForeground(currentTheme.TextMuted()).
+		BorderBackground(lipgloss.Color(currentTheme.Background())).
+		BorderForeground(lipgloss.Color(currentTheme.TextMuted())).
 		Width(lipgloss.Width(content) + 4).
-		Render(content)
+		Render(content)}
+}
+
+func (t *themeDialogCmp) Draw(scr uv.Screen, area uv.Rectangle) *tea.Cursor {
+	view := t.View().Content
+	render.DrawCenter(scr, area, view)
+	return nil
 }
 
 func (t *themeDialogCmp) BindingKeys() []key.Binding {
@@ -195,4 +204,3 @@ func NewThemeDialogCmp() ThemeDialog {
 		currentTheme: "",
 	}
 }
-

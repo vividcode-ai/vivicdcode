@@ -5,8 +5,8 @@ import (
 	"strings"
 	"time"
 
-	tea "github.com/charmbracelet/bubbletea"
-	"github.com/charmbracelet/lipgloss"
+	tea "charm.land/bubbletea/v2"
+	"charm.land/lipgloss/v2"
 	"github.com/vividcode-ai/vividcode/internal/config"
 	"github.com/vividcode-ai/vividcode/internal/llm/models"
 	"github.com/vividcode-ai/vividcode/internal/lsp"
@@ -21,6 +21,7 @@ import (
 
 type StatusCmp interface {
 	tea.Model
+	SetWidth(width int)
 }
 
 type statusCmp struct {
@@ -38,11 +39,11 @@ func (m statusCmp) clearMessageCmd(ttl time.Duration) tea.Cmd {
 	})
 }
 
-func (m statusCmp) Init() tea.Cmd {
+func (m *statusCmp) Init() tea.Cmd {
 	return nil
 }
 
-func (m statusCmp) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
+func (m *statusCmp) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	switch msg := msg.(type) {
 	case tea.WindowSizeMsg:
 		m.width = msg.Width
@@ -78,8 +79,8 @@ func getHelpWidget() string {
 	helpText := "ctrl+? help"
 
 	return styles.Padded().
-		Background(t.TextMuted()).
-		Foreground(t.BackgroundDarker()).
+		Background(lipgloss.Color(t.TextMuted())).
+		Foreground(lipgloss.Color(t.BackgroundDarker())).
 		Bold(true).
 		Render(helpText)
 }
@@ -116,7 +117,7 @@ func formatTokensAndCost(tokens, contextWindow int64, cost float64) string {
 	return fmt.Sprintf("Context: %s, Cost: %s", formattedTokens, formattedCost)
 }
 
-func (m statusCmp) View() string {
+func (m *statusCmp) View() tea.View {
 	t := theme.CurrentTheme()
 	modelID := config.Get().Agents[config.AgentCoder].Model
 	model := models.SupportedModels[modelID]
@@ -129,34 +130,34 @@ func (m statusCmp) View() string {
 		totalTokens := m.session.PromptTokens + m.session.CompletionTokens
 		tokens := formatTokensAndCost(totalTokens, model.ContextWindow, m.session.Cost)
 		tokensStyle := styles.Padded().
-			Background(t.Text()).
-			Foreground(t.BackgroundSecondary())
+			Background(lipgloss.Color(t.Text())).
+			Foreground(lipgloss.Color(t.BackgroundSecondary()))
 		percentage := (float64(totalTokens) / float64(model.ContextWindow)) * 100
 		if percentage > 80 {
-			tokensStyle = tokensStyle.Background(t.Warning())
+			tokensStyle = tokensStyle.Background(lipgloss.Color(t.Warning()))
 		}
 		tokenInfoWidth = lipgloss.Width(tokens) + 2
 		status += tokensStyle.Render(tokens)
 	}
 
 	diagnostics := styles.Padded().
-		Background(t.BackgroundDarker()).
+		Background(lipgloss.Color(t.BackgroundDarker())).
 		Render(m.projectDiagnostics())
 
 	availableWidht := max(0, m.width-lipgloss.Width(helpWidget)-lipgloss.Width(m.model())-lipgloss.Width(diagnostics)-tokenInfoWidth)
 
 	if m.info.Msg != "" {
 		infoStyle := styles.Padded().
-			Foreground(t.Background()).
+			Foreground(lipgloss.Color(t.Background())).
 			Width(availableWidht)
 
 		switch m.info.Type {
 		case util.InfoTypeInfo:
-			infoStyle = infoStyle.Background(t.Info())
+			infoStyle = infoStyle.Background(lipgloss.Color(t.Info()))
 		case util.InfoTypeWarn:
-			infoStyle = infoStyle.Background(t.Warning())
+			infoStyle = infoStyle.Background(lipgloss.Color(t.Warning()))
 		case util.InfoTypeError:
-			infoStyle = infoStyle.Background(t.Error())
+			infoStyle = infoStyle.Background(lipgloss.Color(t.Error()))
 		}
 
 		infoWidth := availableWidht - 10
@@ -168,15 +169,15 @@ func (m statusCmp) View() string {
 		status += infoStyle.Render(msg)
 	} else {
 		status += styles.Padded().
-			Foreground(t.Text()).
-			Background(t.BackgroundSecondary()).
+			Foreground(lipgloss.Color(t.Text())).
+			Background(lipgloss.Color(t.BackgroundSecondary())).
 			Width(availableWidht).
 			Render("")
 	}
 
 	status += diagnostics
 	status += m.model()
-	return status
+	return tea.View{Content: status}
 }
 
 func (m *statusCmp) projectDiagnostics() string {
@@ -194,8 +195,8 @@ func (m *statusCmp) projectDiagnostics() string {
 	// If any server is initializing, show that status
 	if initializing {
 		return lipgloss.NewStyle().
-			Background(t.BackgroundDarker()).
-			Foreground(t.Warning()).
+			Background(lipgloss.Color(t.BackgroundDarker())).
+			Foreground(lipgloss.Color(t.Warning())).
 			Render(fmt.Sprintf("%s Initializing LSP...", styles.SpinnerIcon))
 	}
 
@@ -228,29 +229,29 @@ func (m *statusCmp) projectDiagnostics() string {
 
 	if len(errorDiagnostics) > 0 {
 		errStr := lipgloss.NewStyle().
-			Background(t.BackgroundDarker()).
-			Foreground(t.Error()).
+			Background(lipgloss.Color(t.BackgroundDarker())).
+			Foreground(lipgloss.Color(t.Error())).
 			Render(fmt.Sprintf("%s %d", styles.ErrorIcon, len(errorDiagnostics)))
 		diagnostics = append(diagnostics, errStr)
 	}
 	if len(warnDiagnostics) > 0 {
 		warnStr := lipgloss.NewStyle().
-			Background(t.BackgroundDarker()).
-			Foreground(t.Warning()).
+			Background(lipgloss.Color(t.BackgroundDarker())).
+			Foreground(lipgloss.Color(t.Warning())).
 			Render(fmt.Sprintf("%s %d", styles.WarningIcon, len(warnDiagnostics)))
 		diagnostics = append(diagnostics, warnStr)
 	}
 	if len(hintDiagnostics) > 0 {
 		hintStr := lipgloss.NewStyle().
-			Background(t.BackgroundDarker()).
-			Foreground(t.Text()).
+			Background(lipgloss.Color(t.BackgroundDarker())).
+			Foreground(lipgloss.Color(t.Text())).
 			Render(fmt.Sprintf("%s %d", styles.HintIcon, len(hintDiagnostics)))
 		diagnostics = append(diagnostics, hintStr)
 	}
 	if len(infoDiagnostics) > 0 {
 		infoStr := lipgloss.NewStyle().
-			Background(t.BackgroundDarker()).
-			Foreground(t.Info()).
+			Background(lipgloss.Color(t.BackgroundDarker())).
+			Foreground(lipgloss.Color(t.Info())).
 			Render(fmt.Sprintf("%s %d", styles.InfoIcon, len(infoDiagnostics)))
 		diagnostics = append(diagnostics, infoStr)
 	}
@@ -258,7 +259,7 @@ func (m *statusCmp) projectDiagnostics() string {
 	return strings.Join(diagnostics, " ")
 }
 
-func (m statusCmp) availableFooterMsgWidth(diagnostics, tokenInfo string) int {
+func (m *statusCmp) availableFooterMsgWidth(diagnostics, tokenInfo string) int {
 	tokensWidth := 0
 	if m.session.ID != "" {
 		tokensWidth = lipgloss.Width(tokenInfo) + 2
@@ -266,7 +267,7 @@ func (m statusCmp) availableFooterMsgWidth(diagnostics, tokenInfo string) int {
 	return max(0, m.width-lipgloss.Width(helpWidget)-lipgloss.Width(m.model())-lipgloss.Width(diagnostics)-tokensWidth)
 }
 
-func (m statusCmp) model() string {
+func (m *statusCmp) model() string {
 	t := theme.CurrentTheme()
 
 	cfg := config.Get()
@@ -278,9 +279,13 @@ func (m statusCmp) model() string {
 	model := models.SupportedModels[coder.Model]
 
 	return styles.Padded().
-		Background(t.Secondary()).
-		Foreground(t.Background()).
+		Background(lipgloss.Color(t.Secondary())).
+		Foreground(lipgloss.Color(t.Background())).
 		Render(model.Name)
+}
+
+func (m *statusCmp) SetWidth(width int) {
+	m.width = width
 }
 
 func NewStatusCmp(lspClients map[string]*lsp.Client) StatusCmp {

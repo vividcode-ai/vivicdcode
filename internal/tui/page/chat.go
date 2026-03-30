@@ -4,9 +4,10 @@ import (
 	"context"
 	"strings"
 
-	"github.com/charmbracelet/bubbles/key"
-	tea "github.com/charmbracelet/bubbletea"
-	"github.com/charmbracelet/lipgloss"
+	"charm.land/bubbles/v2/key"
+	tea "charm.land/bubbletea/v2"
+	"charm.land/lipgloss/v2"
+	uv "github.com/charmbracelet/ultraviolet"
 	"github.com/vividcode-ai/vividcode/internal/app"
 	"github.com/vividcode-ai/vividcode/internal/completions"
 	"github.com/vividcode-ai/vividcode/internal/message"
@@ -76,7 +77,7 @@ func (p *chatPage) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		if p.app.CoderAgent.IsBusy() {
 			return p, util.ReportWarn("Agent is busy, please wait before executing a command...")
 		}
-		
+
 		// Process the command content with arguments if any
 		content := msg.Content
 		if msg.Args != nil {
@@ -86,7 +87,7 @@ func (p *chatPage) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				content = strings.ReplaceAll(content, placeholder, value)
 			}
 		}
-		
+
 		// Handle custom command execution
 		cmd := p.sendMessage(content, nil)
 		if cmd != nil {
@@ -179,19 +180,25 @@ func (p *chatPage) SetSize(width, height int) tea.Cmd {
 	return p.layout.SetSize(width, height)
 }
 
+func (p *chatPage) ScrollBy(lines int) {
+	if scroller, ok := p.layout.(interface{ ScrollBy(lines int) }); ok {
+		scroller.ScrollBy(lines)
+	}
+}
+
 func (p *chatPage) GetSize() (int, int) {
 	return p.layout.GetSize()
 }
 
-func (p *chatPage) View() string {
-	layoutView := p.layout.View()
+func (p *chatPage) View() tea.View {
+	layoutView := p.layout.View().Content
 
 	if p.showCompletionDialog {
 		_, layoutHeight := p.layout.GetSize()
 		editorWidth, editorHeight := p.editor.GetSize()
 
 		p.completionDialog.SetWidth(editorWidth)
-		overlay := p.completionDialog.View()
+		overlay := p.completionDialog.View().Content
 
 		layoutView = layout.PlaceOverlay(
 			0,
@@ -202,7 +209,7 @@ func (p *chatPage) View() string {
 		)
 	}
 
-	return layoutView
+	return tea.View{Content: layoutView}
 }
 
 func (p *chatPage) BindingKeys() []key.Binding {
@@ -210,6 +217,16 @@ func (p *chatPage) BindingKeys() []key.Binding {
 	bindings = append(bindings, p.messages.BindingKeys()...)
 	bindings = append(bindings, p.editor.BindingKeys()...)
 	return bindings
+}
+
+func (p *chatPage) Draw(scr uv.Screen, area uv.Rectangle) *tea.Cursor {
+	p.layout.Draw(scr, area)
+	// Return cursor from editor if focused
+	cur := p.editor.GetCursor()
+	if cur.X == 0 && cur.Y == 0 {
+		return nil
+	}
+	return &cur
 }
 
 func NewChatPage(app *app.App) tea.Model {
@@ -232,6 +249,7 @@ func NewChatPage(app *app.App) tea.Model {
 		layout: layout.NewSplitPane(
 			layout.WithLeftPanel(messagesContainer),
 			layout.WithBottomPanel(editorContainer),
+			layout.WithVerticalRatio(0.9), // main 占 90%, editor 占 10%
 		),
 	}
 }

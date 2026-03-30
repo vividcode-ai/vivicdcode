@@ -3,9 +3,11 @@ package dialog
 import (
 	"strings"
 
-	"github.com/charmbracelet/bubbles/key"
-	tea "github.com/charmbracelet/bubbletea"
-	"github.com/charmbracelet/lipgloss"
+	"charm.land/bubbles/v2/key"
+	tea "charm.land/bubbletea/v2"
+	"charm.land/lipgloss/v2"
+	uv "github.com/charmbracelet/ultraviolet"
+	"github.com/vividcode-ai/vividcode/internal/tui/render"
 	"github.com/vividcode-ai/vividcode/internal/tui/styles"
 	"github.com/vividcode-ai/vividcode/internal/tui/theme"
 )
@@ -58,13 +60,13 @@ func (h *helpCmp) render() string {
 	baseStyle := styles.BaseStyle()
 
 	helpKeyStyle := styles.Bold().
-		Background(t.Background()).
-		Foreground(t.Text()).
+		Background(lipgloss.Color(t.Background())).
+		Foreground(lipgloss.Color(t.Text())).
 		Padding(0, 1, 0, 0)
 
 	helpDescStyle := styles.Regular().
-		Background(t.Background()).
-		Foreground(t.TextMuted())
+		Background(lipgloss.Color(t.Background())).
+		Foreground(lipgloss.Color(t.TextMuted()))
 
 	// Compile list of bindings to render
 	bindings := removeDuplicateBindings(h.keys)
@@ -144,7 +146,6 @@ func (h *helpCmp) render() string {
 			lipgloss.Left,              // x
 			lipgloss.Top,               // y
 			lastPair,                   // content
-			lipgloss.WithWhitespaceBackground(t.Background()),
 		))
 		content := baseStyle.Width(h.width).Render(
 			lipgloss.JoinHorizontal(
@@ -165,7 +166,7 @@ func (h *helpCmp) render() string {
 	return content
 }
 
-func (h *helpCmp) View() string {
+func (h *helpCmp) View() tea.View {
 	t := theme.CurrentTheme()
 	baseStyle := styles.BaseStyle()
 
@@ -173,26 +174,33 @@ func (h *helpCmp) View() string {
 	header := baseStyle.
 		Bold(true).
 		Width(lipgloss.Width(content)).
-		Foreground(t.Primary()).
+		Foreground(lipgloss.Color(t.Primary())).
 		Render("Keyboard Shortcuts")
 
-	return baseStyle.Padding(1).
+	return tea.View{Content: baseStyle.Padding(1).
 		Border(lipgloss.RoundedBorder()).
-		BorderForeground(t.TextMuted()).
+		BorderForeground(lipgloss.Color(t.TextMuted())).
 		Width(h.width).
-		BorderBackground(t.Background()).
+		BorderBackground(lipgloss.Color(t.Background())).
 		Render(
 			lipgloss.JoinVertical(lipgloss.Center,
 				header,
 				baseStyle.Render(strings.Repeat(" ", lipgloss.Width(header))),
 				content,
 			),
-		)
+		)}
+}
+
+func (h *helpCmp) Draw(scr uv.Screen, area uv.Rectangle) *tea.Cursor {
+	view := h.View().Content
+	render.DrawCenter(scr, area, view)
+	return nil
 }
 
 type HelpCmp interface {
 	tea.Model
 	SetBindings([]key.Binding)
+	Draw(scr uv.Screen, area uv.Rectangle) *tea.Cursor
 }
 
 func NewHelpCmp() HelpCmp {

@@ -15,8 +15,6 @@ const (
 	OpenRouterO3             ModelID = "openrouter.o3"
 	OpenRouterO3Mini         ModelID = "openrouter.o3-mini"
 	OpenRouterO4Mini         ModelID = "openrouter.o4-mini"
-	OpenRouterGemini25Flash  ModelID = "openrouter.gemini-2.5-flash"
-	OpenRouterGemini25       ModelID = "openrouter.gemini-2.5"
 	OpenRouterClaude35Sonnet ModelID = "openrouter.claude-3.5-sonnet"
 	OpenRouterClaude3Haiku   ModelID = "openrouter.claude-3-haiku"
 	OpenRouterClaude37Sonnet ModelID = "openrouter.claude-3.7-sonnet"
@@ -174,30 +172,6 @@ var OpenRouterModels = map[ModelID]Model{
 		ContextWindow:      OpenAIModels[O4Mini].ContextWindow,
 		DefaultMaxTokens:   OpenAIModels[O4Mini].DefaultMaxTokens,
 		CanReason:          OpenAIModels[O4Mini].CanReason,
-	},
-	OpenRouterGemini25Flash: {
-		ID:                 OpenRouterGemini25Flash,
-		Name:               "OpenRouter – Gemini 2.5 Flash",
-		Provider:           ProviderOpenRouter,
-		APIModel:           "google/gemini-2.5-flash-preview:thinking",
-		CostPer1MIn:        GeminiModels[Gemini25Flash].CostPer1MIn,
-		CostPer1MInCached:  GeminiModels[Gemini25Flash].CostPer1MInCached,
-		CostPer1MOut:       GeminiModels[Gemini25Flash].CostPer1MOut,
-		CostPer1MOutCached: GeminiModels[Gemini25Flash].CostPer1MOutCached,
-		ContextWindow:      GeminiModels[Gemini25Flash].ContextWindow,
-		DefaultMaxTokens:   GeminiModels[Gemini25Flash].DefaultMaxTokens,
-	},
-	OpenRouterGemini25: {
-		ID:                 OpenRouterGemini25,
-		Name:               "OpenRouter – Gemini 2.5 Pro",
-		Provider:           ProviderOpenRouter,
-		APIModel:           "google/gemini-2.5-pro-preview-03-25",
-		CostPer1MIn:        GeminiModels[Gemini25].CostPer1MIn,
-		CostPer1MInCached:  GeminiModels[Gemini25].CostPer1MInCached,
-		CostPer1MOut:       GeminiModels[Gemini25].CostPer1MOut,
-		CostPer1MOutCached: GeminiModels[Gemini25].CostPer1MOutCached,
-		ContextWindow:      GeminiModels[Gemini25].ContextWindow,
-		DefaultMaxTokens:   GeminiModels[Gemini25].DefaultMaxTokens,
 	},
 	OpenRouterClaude35Sonnet: {
 		ID:                 OpenRouterClaude35Sonnet,

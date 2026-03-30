@@ -3,13 +3,13 @@ package chat
 import (
 	"context"
 	"fmt"
-	"math"
+	"strings"
 
-	"github.com/charmbracelet/bubbles/key"
-	"github.com/charmbracelet/bubbles/spinner"
-	"github.com/charmbracelet/bubbles/viewport"
-	tea "github.com/charmbracelet/bubbletea"
-	"github.com/charmbracelet/lipgloss"
+	"charm.land/bubbles/v2/key"
+	"charm.land/bubbles/v2/spinner"
+	tea "charm.land/bubbletea/v2"
+	"charm.land/lipgloss/v2"
+	uv "github.com/charmbracelet/ultraviolet"
 	"github.com/vividcode-ai/vividcode/internal/app"
 	"github.com/vividcode-ai/vividcode/internal/message"
 	"github.com/vividcode-ai/vividcode/internal/pubsub"
@@ -20,23 +20,19 @@ import (
 	"github.com/vividcode-ai/vividcode/internal/tui/util"
 )
 
-type cacheItem struct {
-	width   int
-	content []uiMessage
-}
 type messagesCmp struct {
 	app           *app.App
 	width, height int
-	viewport      viewport.Model
+	vlist         *VirtualList
 	session       session.Session
 	messages      []message.Message
-	uiMessages    []uiMessage
 	currentMsgID  string
-	cachedContent map[string]cacheItem
 	spinner       spinner.Model
 	rendering     bool
-	attachments   viewport.Model
+	follow        bool
+	idIndexMap    map[string]int
 }
+
 type renderFinishedMsg struct{}
 
 type MessageKeys struct {
@@ -44,15 +40,17 @@ type MessageKeys struct {
 	PageUp       key.Binding
 	HalfPageUp   key.Binding
 	HalfPageDown key.Binding
+	ScrollUp     key.Binding
+	ScrollDown   key.Binding
 }
 
 var messageKeys = MessageKeys{
 	PageDown: key.NewBinding(
-		key.WithKeys("pgdown"),
+		key.WithKeys("pgdown", "f"),
 		key.WithHelp("f/pgdn", "page down"),
 	),
 	PageUp: key.NewBinding(
-		key.WithKeys("pgup"),
+		key.WithKeys("pgup", "b"),
 		key.WithHelp("b/pgup", "page up"),
 	),
 	HalfPageUp: key.NewBinding(
@@ -60,213 +58,118 @@ var messageKeys = MessageKeys{
 		key.WithHelp("ctrl+u", "½ page up"),
 	),
 	HalfPageDown: key.NewBinding(
-		key.WithKeys("ctrl+d", "ctrl+d"),
+		key.WithKeys("ctrl+d"),
 		key.WithHelp("ctrl+d", "½ page down"),
+	),
+	ScrollUp: key.NewBinding(
+		key.WithKeys("up", "k"),
+		key.WithHelp("↑/k", "scroll up"),
+	),
+	ScrollDown: key.NewBinding(
+		key.WithKeys("down", "j"),
+		key.WithHelp("↓/j", "scroll down"),
 	),
 }
 
 func (m *messagesCmp) Init() tea.Cmd {
-	return tea.Batch(m.viewport.Init(), m.spinner.Tick)
+	return m.spinner.Tick
 }
 
 func (m *messagesCmp) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
-	var cmds []tea.Cmd
 	switch msg := msg.(type) {
 	case dialog.ThemeChangedMsg:
 		m.rerender()
 		return m, nil
+
 	case SessionSelectedMsg:
 		if msg.ID != m.session.ID {
 			cmd := m.SetSession(msg)
 			return m, cmd
 		}
+		m.follow = true
 		return m, nil
+
 	case SessionClearedMsg:
 		m.session = session.Session{}
 		m.messages = make([]message.Message, 0)
 		m.currentMsgID = ""
 		m.rendering = false
+		m.idIndexMap = make(map[string]int)
+		m.vlist.SetItems(nil)
+		m.follow = false
 		return m, nil
 
 	case tea.KeyMsg:
-		if key.Matches(msg, messageKeys.PageUp) || key.Matches(msg, messageKeys.PageDown) ||
-			key.Matches(msg, messageKeys.HalfPageUp) || key.Matches(msg, messageKeys.HalfPageDown) {
-			u, cmd := m.viewport.Update(msg)
-			m.viewport = u
-			cmds = append(cmds, cmd)
+		if key.Matches(msg, messageKeys.PageDown) {
+			m.vlist.PageDown()
+			m.follow = false
+		} else if key.Matches(msg, messageKeys.PageUp) {
+			m.vlist.PageUp()
+			m.follow = false
+		} else if key.Matches(msg, messageKeys.HalfPageUp) {
+			m.vlist.HalfPageUp()
+			m.follow = false
+		} else if key.Matches(msg, messageKeys.HalfPageDown) {
+			m.vlist.HalfPageDown()
+			m.follow = false
+		} else if key.Matches(msg, messageKeys.ScrollUp) {
+			m.vlist.ScrollUp()
+			m.follow = false
+		} else if key.Matches(msg, messageKeys.ScrollDown) {
+			m.vlist.ScrollDown()
+			m.follow = false
 		}
 
 	case renderFinishedMsg:
 		m.rendering = false
-		m.viewport.GotoBottom()
+
 	case pubsub.Event[session.Session]:
 		if msg.Type == pubsub.UpdatedEvent && msg.Payload.ID == m.session.ID {
 			m.session = msg.Payload
 			if m.session.SummaryMessageID == m.currentMsgID {
-				delete(m.cachedContent, m.currentMsgID)
-				m.renderView()
+				m.rerender()
 			}
 		}
+
 	case pubsub.Event[message.Message]:
-		needsRerender := false
-		if msg.Type == pubsub.CreatedEvent {
-			if msg.Payload.SessionID == m.session.ID {
-
-				messageExists := false
-				for _, v := range m.messages {
-					if v.ID == msg.Payload.ID {
-						messageExists = true
-						break
-					}
-				}
-
-				if !messageExists {
-					if len(m.messages) > 0 {
-						lastMsgID := m.messages[len(m.messages)-1].ID
-						delete(m.cachedContent, lastMsgID)
-					}
-
-					m.messages = append(m.messages, msg.Payload)
-					delete(m.cachedContent, m.currentMsgID)
-					m.currentMsgID = msg.Payload.ID
-					needsRerender = true
-				}
-			}
-			// There are tool calls from the child task
-			for _, v := range m.messages {
-				for _, c := range v.ToolCalls() {
-					if c.ID == msg.Payload.SessionID {
-						delete(m.cachedContent, v.ID)
-						needsRerender = true
-					}
-				}
-			}
-		} else if msg.Type == pubsub.UpdatedEvent && msg.Payload.SessionID == m.session.ID {
-			for i, v := range m.messages {
-				if v.ID == msg.Payload.ID {
-					m.messages[i] = msg.Payload
-					delete(m.cachedContent, msg.Payload.ID)
-					needsRerender = true
-					break
-				}
-			}
+		if msg.Payload.SessionID != m.session.ID {
+			break
 		}
-		if needsRerender {
-			m.renderView()
-			if len(m.messages) > 0 {
-				if (msg.Type == pubsub.CreatedEvent) ||
-					(msg.Type == pubsub.UpdatedEvent && msg.Payload.ID == m.messages[len(m.messages)-1].ID) {
-					m.viewport.GotoBottom()
+		if msg.Type == pubsub.CreatedEvent {
+			if _, exists := m.idIndexMap[msg.Payload.ID]; !exists {
+				m.messages = append(m.messages, msg.Payload)
+				m.idIndexMap[msg.Payload.ID] = len(m.messages) - 1
+				m.currentMsgID = msg.Payload.ID
+				m.vlist.AppendItems(newMsgItem(msg.Payload))
+				if m.follow {
+					m.vlist.ScrollToBottom()
 				}
+			}
+		} else if msg.Type == pubsub.UpdatedEvent {
+			if idx, exists := m.idIndexMap[msg.Payload.ID]; exists {
+				m.messages[idx] = msg.Payload
+				m.vlist.UpdateItem(idx, newMsgItem(msg.Payload))
 			}
 		}
 	}
-
-	spinner, cmd := m.spinner.Update(msg)
-	m.spinner = spinner
-	cmds = append(cmds, cmd)
-	return m, tea.Batch(cmds...)
+	return m, nil
 }
 
 func (m *messagesCmp) IsAgentWorking() bool {
 	return m.app.CoderAgent.IsSessionBusy(m.session.ID)
 }
 
-func formatTimeDifference(unixTime1, unixTime2 int64) string {
-	diffSeconds := float64(math.Abs(float64(unixTime2 - unixTime1)))
-
-	if diffSeconds < 60 {
-		return fmt.Sprintf("%.1fs", diffSeconds)
-	}
-
-	minutes := int(diffSeconds / 60)
-	seconds := int(diffSeconds) % 60
-	return fmt.Sprintf("%dm%ds", minutes, seconds)
+func (m *messagesCmp) updateList() {
+	items := messagesToItems(m.messages)
+	m.vlist.SetItems(items)
 }
 
-func (m *messagesCmp) renderView() {
-	m.uiMessages = make([]uiMessage, 0)
-	pos := 0
+func (m *messagesCmp) View() tea.View {
 	baseStyle := styles.BaseStyle()
 
-	if m.width == 0 {
-		return
-	}
-	for inx, msg := range m.messages {
-		switch msg.Role {
-		case message.User:
-			if cache, ok := m.cachedContent[msg.ID]; ok && cache.width == m.width {
-				m.uiMessages = append(m.uiMessages, cache.content...)
-				continue
-			}
-			userMsg := renderUserMessage(
-				msg,
-				msg.ID == m.currentMsgID,
-				m.width,
-				pos,
-			)
-			m.uiMessages = append(m.uiMessages, userMsg)
-			m.cachedContent[msg.ID] = cacheItem{
-				width:   m.width,
-				content: []uiMessage{userMsg},
-			}
-			pos += userMsg.height + 1 // + 1 for spacing
-		case message.Assistant:
-			if cache, ok := m.cachedContent[msg.ID]; ok && cache.width == m.width {
-				m.uiMessages = append(m.uiMessages, cache.content...)
-				continue
-			}
-			isSummary := m.session.SummaryMessageID == msg.ID
-
-			assistantMessages := renderAssistantMessage(
-				msg,
-				inx,
-				m.messages,
-				m.app.Messages,
-				m.currentMsgID,
-				isSummary,
-				m.width,
-				pos,
-			)
-			for _, msg := range assistantMessages {
-				m.uiMessages = append(m.uiMessages, msg)
-				pos += msg.height + 1 // + 1 for spacing
-			}
-			m.cachedContent[msg.ID] = cacheItem{
-				width:   m.width,
-				content: assistantMessages,
-			}
-		}
-	}
-
-	messages := make([]string, 0)
-	for _, v := range m.uiMessages {
-		messages = append(messages, lipgloss.JoinVertical(lipgloss.Left, v.content),
-			baseStyle.
-				Width(m.width).
-				Render(
-					"",
-				),
-		)
-	}
-
-	m.viewport.SetContent(
-		baseStyle.
-			Width(m.width).
-			Render(
-				lipgloss.JoinVertical(
-					lipgloss.Top,
-					messages...,
-				),
-			),
-	)
-}
-
-func (m *messagesCmp) View() string {
-	baseStyle := styles.BaseStyle()
-
+	var content string
 	if m.rendering {
-		return baseStyle.
+		content = baseStyle.
 			Width(m.width).
 			Render(
 				lipgloss.JoinVertical(
@@ -276,37 +179,51 @@ func (m *messagesCmp) View() string {
 					m.help(),
 				),
 			)
-	}
-	if len(m.messages) == 0 {
-		content := baseStyle.
+	} else if len(m.messages) == 0 {
+		innerContent := baseStyle.
 			Width(m.width).
 			Height(m.height - 1).
 			Render(
 				m.initialScreen(),
 			)
-
-		return baseStyle.
+		content = baseStyle.
 			Width(m.width).
 			Render(
 				lipgloss.JoinVertical(
 					lipgloss.Top,
-					content,
+					innerContent,
 					"",
+					m.help(),
+				),
+			)
+	} else {
+		listContent := m.vlist.Render()
+		content = baseStyle.
+			Width(m.width).
+			Render(
+				lipgloss.JoinVertical(
+					lipgloss.Top,
+					listContent,
+					m.working(),
 					m.help(),
 				),
 			)
 	}
 
-	return baseStyle.
-		Width(m.width).
-		Render(
-			lipgloss.JoinVertical(
-				lipgloss.Top,
-				m.viewport.View(),
-				m.working(),
-				m.help(),
-			),
-		)
+	actualHeight := lipgloss.Height(content)
+	if actualHeight < m.height {
+		fillLine := strings.Repeat(" ", m.width)
+		for i := actualHeight; i < m.height; i++ {
+			content += "\n" + fillLine
+		}
+	}
+
+	return tea.View{Content: content}
+}
+
+func (m *messagesCmp) Draw(scr uv.Screen, area uv.Rectangle) {
+	content := m.View().Content
+	uv.NewStyledString(content).Draw(scr, area)
 }
 
 func hasToolsWithoutResponse(messages []message.Message) bool {
@@ -316,7 +233,6 @@ func hasToolsWithoutResponse(messages []message.Message) bool {
 		toolCalls = append(toolCalls, m.ToolCalls()...)
 		toolResults = append(toolResults, m.ToolResults()...)
 	}
-
 	for _, v := range toolCalls {
 		found := false
 		for _, r := range toolResults {
@@ -363,7 +279,7 @@ func (m *messagesCmp) working() string {
 		if task != "" {
 			text += baseStyle.
 				Width(m.width).
-				Foreground(t.Primary()).
+				Foreground(lipgloss.Color(t.Primary())).
 				Bold(true).
 				Render(fmt.Sprintf("%s %s ", m.spinner.View(), task))
 		}
@@ -380,19 +296,19 @@ func (m *messagesCmp) help() string {
 	if m.app.CoderAgent.IsBusy() {
 		text += lipgloss.JoinHorizontal(
 			lipgloss.Left,
-			baseStyle.Foreground(t.TextMuted()).Bold(true).Render("press "),
-			baseStyle.Foreground(t.Text()).Bold(true).Render("esc"),
-			baseStyle.Foreground(t.TextMuted()).Bold(true).Render(" to exit cancel"),
+			baseStyle.Foreground(lipgloss.Color(t.TextMuted())).Bold(true).Render("press "),
+			baseStyle.Foreground(lipgloss.Color(t.Text())).Bold(true).Render("esc"),
+			baseStyle.Foreground(lipgloss.Color(t.TextMuted())).Bold(true).Render(" to exit cancel"),
 		)
 	} else {
 		text += lipgloss.JoinHorizontal(
 			lipgloss.Left,
-			baseStyle.Foreground(t.TextMuted()).Bold(true).Render("press "),
-			baseStyle.Foreground(t.Text()).Bold(true).Render("enter"),
-			baseStyle.Foreground(t.TextMuted()).Bold(true).Render(" to send the message,"),
-			baseStyle.Foreground(t.TextMuted()).Bold(true).Render(" write"),
-			baseStyle.Foreground(t.Text()).Bold(true).Render(" \\"),
-			baseStyle.Foreground(t.TextMuted()).Bold(true).Render(" and enter to add a new line"),
+			baseStyle.Foreground(lipgloss.Color(t.TextMuted())).Bold(true).Render("press "),
+			baseStyle.Foreground(lipgloss.Color(t.Text())).Bold(true).Render("enter"),
+			baseStyle.Foreground(lipgloss.Color(t.TextMuted())).Bold(true).Render(" to send the message,"),
+			baseStyle.Foreground(lipgloss.Color(t.TextMuted())).Bold(true).Render(" write"),
+			baseStyle.Foreground(lipgloss.Color(t.Text())).Bold(true).Render(" \\"),
+			baseStyle.Foreground(lipgloss.Color(t.TextMuted())).Bold(true).Render(" and enter to add a new line"),
 		)
 	}
 	return baseStyle.
@@ -406,7 +322,7 @@ func (m *messagesCmp) initialScreen() string {
 	return baseStyle.Width(m.width).Render(
 		lipgloss.JoinVertical(
 			lipgloss.Top,
-			header(m.width),
+			Header(m.width),
 			"",
 			lspsConfigured(m.width),
 		),
@@ -414,10 +330,7 @@ func (m *messagesCmp) initialScreen() string {
 }
 
 func (m *messagesCmp) rerender() {
-	for _, msg := range m.messages {
-		delete(m.cachedContent, msg.ID)
-	}
-	m.renderView()
+	m.vlist.SetItems(messagesToItems(m.messages))
 }
 
 func (m *messagesCmp) SetSize(width, height int) tea.Cmd {
@@ -426,10 +339,7 @@ func (m *messagesCmp) SetSize(width, height int) tea.Cmd {
 	}
 	m.width = width
 	m.height = height
-	m.viewport.Width = width
-	m.viewport.Height = height - 2
-	m.attachments.Width = width + 40
-	m.attachments.Height = 3
+	m.vlist.SetSize(width, height-2)
 	m.rerender()
 	return nil
 }
@@ -438,50 +348,53 @@ func (m *messagesCmp) GetSize() (int, int) {
 	return m.width, m.height
 }
 
-func (m *messagesCmp) SetSession(session session.Session) tea.Cmd {
-	if m.session.ID == session.ID {
+func (m *messagesCmp) SetSession(s session.Session) tea.Cmd {
+	if m.session.ID == s.ID {
 		return nil
 	}
-	m.session = session
-	messages, err := m.app.Messages.List(context.Background(), session.ID)
+	m.session = s
+	messages, err := m.app.Messages.List(context.Background(), s.ID)
 	if err != nil {
-		return util.ReportError(err)
+		return func() tea.Msg { return util.ReportError(err) }
 	}
 	m.messages = messages
+	m.idIndexMap = make(map[string]int)
+	for i, msg := range messages {
+		m.idIndexMap[msg.ID] = i
+	}
 	if len(m.messages) > 0 {
 		m.currentMsgID = m.messages[len(m.messages)-1].ID
 	}
-	delete(m.cachedContent, m.currentMsgID)
 	m.rendering = true
-	return func() tea.Msg {
-		m.renderView()
-		return renderFinishedMsg{}
-	}
+	m.follow = true
+	m.updateList()
+	return func() tea.Msg { return renderFinishedMsg{} }
+}
+
+func (m *messagesCmp) ScrollBy(lines int) {
+	m.vlist.ScrollBy(lines)
+	m.follow = lines > 0 && m.vlist.AtBottom()
 }
 
 func (m *messagesCmp) BindingKeys() []key.Binding {
 	return []key.Binding{
-		m.viewport.KeyMap.PageDown,
-		m.viewport.KeyMap.PageUp,
-		m.viewport.KeyMap.HalfPageUp,
-		m.viewport.KeyMap.HalfPageDown,
+		messageKeys.PageDown,
+		messageKeys.PageUp,
+		messageKeys.HalfPageUp,
+		messageKeys.HalfPageDown,
+		messageKeys.ScrollUp,
+		messageKeys.ScrollDown,
 	}
 }
 
 func NewMessagesCmp(app *app.App) tea.Model {
 	s := spinner.New()
 	s.Spinner = spinner.Pulse
-	vp := viewport.New(0, 0)
-	attachmets := viewport.New(0, 0)
-	vp.KeyMap.PageUp = messageKeys.PageUp
-	vp.KeyMap.PageDown = messageKeys.PageDown
-	vp.KeyMap.HalfPageUp = messageKeys.HalfPageUp
-	vp.KeyMap.HalfPageDown = messageKeys.HalfPageDown
+	vlist := NewVirtualList()
 	return &messagesCmp{
-		app:           app,
-		cachedContent: make(map[string]cacheItem),
-		viewport:      vp,
-		spinner:       s,
-		attachments:   attachmets,
+		app:        app,
+		spinner:    s,
+		vlist:      vlist,
+		idIndexMap: make(map[string]int),
 	}
 }

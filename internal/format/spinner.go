@@ -5,8 +5,8 @@ import (
 	"fmt"
 	"os"
 
-	"github.com/charmbracelet/bubbles/spinner"
-	tea "github.com/charmbracelet/bubbletea"
+	"charm.land/bubbles/v2/spinner"
+	tea "charm.land/bubbletea/v2"
 )
 
 // Spinner wraps the bubbles spinner for non-interactive mode
@@ -46,11 +46,11 @@ func (m spinnerModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	}
 }
 
-func (m spinnerModel) View() string {
+func (m spinnerModel) View() tea.View {
 	if m.quitting {
-		return ""
+		return tea.View{Content: ""}
 	}
-	return fmt.Sprintf("%s %s", m.spinner.View(), m.message)
+	return tea.View{Content: fmt.Sprintf("%s %s", m.spinner.View(), m.message)}
 }
 
 // quitMsg is sent when we want to quit the spinner

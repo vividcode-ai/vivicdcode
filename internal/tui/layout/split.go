@@ -1,9 +1,12 @@
 package layout
 
 import (
-	"github.com/charmbracelet/bubbles/key"
-	tea "github.com/charmbracelet/bubbletea"
-	"github.com/charmbracelet/lipgloss"
+	"strings"
+
+	"charm.land/bubbles/v2/key"
+	tea "charm.land/bubbletea/v2"
+	"charm.land/lipgloss/v2"
+	uv "github.com/charmbracelet/ultraviolet"
 	"github.com/vividcode-ai/vividcode/internal/tui/theme"
 )
 
@@ -18,6 +21,10 @@ type SplitPaneLayout interface {
 	ClearLeftPanel() tea.Cmd
 	ClearRightPanel() tea.Cmd
 	ClearBottomPanel() tea.Cmd
+
+	ScrollBy(lines int)
+
+	Draw(scr uv.Screen, area uv.Rectangle) *tea.Cursor
 }
 
 type splitPaneLayout struct {
@@ -26,9 +33,10 @@ type splitPaneLayout struct {
 	ratio         float64
 	verticalRatio float64
 
-	rightPanel  Container
-	leftPanel   Container
-	bottomPanel Container
+	rightPanel             Container
+	leftPanel              Container
+	bottomPanel            Container
+	bottomPanelFixedHeight int
 }
 
 type SplitPaneOption func(*splitPaneLayout)
@@ -85,44 +93,50 @@ func (s *splitPaneLayout) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	return s, tea.Batch(cmds...)
 }
 
-func (s *splitPaneLayout) View() string {
-	var topSection string
+func (s *splitPaneLayout) View() tea.View {
+	t := theme.CurrentTheme()
 
+	var topSection string
 	if s.leftPanel != nil && s.rightPanel != nil {
 		leftView := s.leftPanel.View()
 		rightView := s.rightPanel.View()
-		topSection = lipgloss.JoinHorizontal(lipgloss.Top, leftView, rightView)
+		topSection = lipgloss.JoinHorizontal(lipgloss.Top, leftView.Content, rightView.Content)
 	} else if s.leftPanel != nil {
-		topSection = s.leftPanel.View()
+		topSection = s.leftPanel.View().Content
 	} else if s.rightPanel != nil {
-		topSection = s.rightPanel.View()
+		topSection = s.rightPanel.View().Content
 	} else {
 		topSection = ""
 	}
 
 	var finalView string
-
 	if s.bottomPanel != nil && topSection != "" {
 		bottomView := s.bottomPanel.View()
-		finalView = lipgloss.JoinVertical(lipgloss.Left, topSection, bottomView)
+		finalView = lipgloss.JoinVertical(lipgloss.Left, topSection, bottomView.Content)
 	} else if s.bottomPanel != nil {
-		finalView = s.bottomPanel.View()
+		finalView = s.bottomPanel.View().Content
 	} else {
 		finalView = topSection
 	}
 
-	if finalView != "" {
-		t := theme.CurrentTheme()
-
-		style := lipgloss.NewStyle().
-			Width(s.width).
-			Height(s.height).
-			Background(t.Background())
-
-		return style.Render(finalView)
+	if finalView == "" {
+		finalView = strings.Repeat(" ", s.width)
 	}
 
-	return finalView
+	currentHeight := lipgloss.Height(finalView)
+	if currentHeight < s.height {
+		fillLine := strings.Repeat(" ", s.width)
+		for i := currentHeight; i < s.height; i++ {
+			finalView += "\n" + fillLine
+		}
+	}
+
+	style := lipgloss.NewStyle().
+		Width(s.width).
+		Height(s.height).
+		Background(lipgloss.Color(t.Background()))
+
+	return tea.View{Content: style.Render(finalView)}
 }
 
 func (s *splitPaneLayout) SetSize(width, height int) tea.Cmd {
@@ -131,8 +145,13 @@ func (s *splitPaneLayout) SetSize(width, height int) tea.Cmd {
 
 	var topHeight, bottomHeight int
 	if s.bottomPanel != nil {
-		topHeight = int(float64(height) * s.verticalRatio)
-		bottomHeight = height - topHeight
+		if s.bottomPanelFixedHeight > 0 {
+			bottomHeight = s.bottomPanelFixedHeight
+			topHeight = height - bottomHeight
+		} else {
+			topHeight = int(float64(height) * s.verticalRatio)
+			bottomHeight = height - topHeight
+		}
 	} else {
 		topHeight = height
 		bottomHeight = 0
@@ -240,10 +259,19 @@ func (s *splitPaneLayout) BindingKeys() []key.Binding {
 	return keys
 }
 
+func (s *splitPaneLayout) Draw(scr uv.Screen, area uv.Rectangle) *tea.Cursor {
+	view := s.View().Content
+	uv.NewStyledString(view).Draw(scr, area)
+
+	// Debug: Check actual drawing area
+	_ = area // area is the rect we're drawing into
+	return nil
+}
+
 func NewSplitPane(options ...SplitPaneOption) SplitPaneLayout {
 
 	layout := &splitPaneLayout{
-		ratio:         0.7,
+		ratio:         0.8,
 		verticalRatio: 0.9, // Default 90% for top section, 10% for bottom
 	}
 	for _, option := range options {
@@ -279,5 +307,20 @@ func WithBottomPanel(panel Container) SplitPaneOption {
 func WithVerticalRatio(ratio float64) SplitPaneOption {
 	return func(s *splitPaneLayout) {
 		s.verticalRatio = ratio
+	}
+}
+
+func WithBottomPanelFixed(panel Container, fixedHeight int) SplitPaneOption {
+	return func(s *splitPaneLayout) {
+		s.bottomPanel = panel
+		s.bottomPanelFixedHeight = fixedHeight
+	}
+}
+
+func (s *splitPaneLayout) ScrollBy(lines int) {
+	if s.leftPanel != nil {
+		if scrollable, ok := s.leftPanel.(interface{ ScrollBy(lines int) }); ok {
+			scrollable.ScrollBy(lines)
+		}
 	}
 }

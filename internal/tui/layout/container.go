@@ -1,9 +1,10 @@
 package layout
 
 import (
-	"github.com/charmbracelet/bubbles/key"
-	tea "github.com/charmbracelet/bubbletea"
-	"github.com/charmbracelet/lipgloss"
+	"charm.land/bubbles/v2/key"
+	tea "charm.land/bubbletea/v2"
+	"charm.land/lipgloss/v2"
+	uv "github.com/charmbracelet/ultraviolet"
 	"github.com/vividcode-ai/vividcode/internal/tui/theme"
 )
 
@@ -11,6 +12,9 @@ type Container interface {
 	tea.Model
 	Sizeable
 	Bindings
+	Draw(scr uv.Screen, area uv.Rectangle) *tea.Cursor
+	GetCursor() tea.Cursor
+	ScrollBy(lines int)
 }
 type container struct {
 	width  int
@@ -41,13 +45,13 @@ func (c *container) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	return c, cmd
 }
 
-func (c *container) View() string {
+func (c *container) View() tea.View {
 	t := theme.CurrentTheme()
 	style := lipgloss.NewStyle()
 	width := c.width
 	height := c.height
 
-	style = style.Background(t.Background())
+	style = style.Background(lipgloss.Color(t.Background()))
 
 	// Apply border if any side is enabled
 	if c.borderTop || c.borderRight || c.borderBottom || c.borderLeft {
@@ -65,7 +69,7 @@ func (c *container) View() string {
 			width--
 		}
 		style = style.Border(c.borderStyle, c.borderTop, c.borderRight, c.borderBottom, c.borderLeft)
-		style = style.BorderBackground(t.Background()).BorderForeground(t.BorderNormal())
+		style = style.BorderBackground(lipgloss.Color(t.Background())).BorderForeground(lipgloss.Color(t.BorderNormal()))
 	}
 	style = style.
 		Width(width).
@@ -75,7 +79,7 @@ func (c *container) View() string {
 		PaddingBottom(c.paddingBottom).
 		PaddingLeft(c.paddingLeft)
 
-	return style.Render(c.content.View())
+	return tea.View{Content: style.Render(c.content.View().Content)}
 }
 
 func (c *container) SetSize(width, height int) tea.Cmd {
@@ -119,6 +123,25 @@ func (c *container) BindingKeys() []key.Binding {
 		return b.BindingKeys()
 	}
 	return []key.Binding{}
+}
+
+func (c *container) Draw(scr uv.Screen, area uv.Rectangle) *tea.Cursor {
+	view := c.View().Content
+	uv.NewStyledString(view).Draw(scr, area)
+	return nil
+}
+
+func (c *container) GetCursor() tea.Cursor {
+	if cursorModel, ok := c.content.(interface{ GetCursor() tea.Cursor }); ok {
+		return cursorModel.GetCursor()
+	}
+	return tea.Cursor{}
+}
+
+func (c *container) ScrollBy(lines int) {
+	if scrollable, ok := c.content.(interface{ ScrollBy(lines int) }); ok {
+		scrollable.ScrollBy(lines)
+	}
 }
 
 type ContainerOption func(*container)

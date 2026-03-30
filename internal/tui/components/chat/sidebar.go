@@ -6,8 +6,8 @@ import (
 	"sort"
 	"strings"
 
-	tea "github.com/charmbracelet/bubbletea"
-	"github.com/charmbracelet/lipgloss"
+	tea "charm.land/bubbletea/v2"
+	"charm.land/lipgloss/v2"
 	"github.com/vividcode-ai/vividcode/internal/config"
 	"github.com/vividcode-ai/vividcode/internal/diff"
 	"github.com/vividcode-ai/vividcode/internal/history"
@@ -81,10 +81,10 @@ func (m *sidebarCmp) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	return m, nil
 }
 
-func (m *sidebarCmp) View() string {
+func (m *sidebarCmp) View() tea.View {
 	baseStyle := styles.BaseStyle()
 
-	return baseStyle.
+	return tea.View{Content: baseStyle.
 		Width(m.width).
 		PaddingLeft(4).
 		PaddingRight(2).
@@ -92,7 +92,7 @@ func (m *sidebarCmp) View() string {
 		Render(
 			lipgloss.JoinVertical(
 				lipgloss.Top,
-				header(m.width),
+				Header(m.width),
 				" ",
 				m.sessionSection(),
 				" ",
@@ -100,7 +100,7 @@ func (m *sidebarCmp) View() string {
 				" ",
 				m.modifiedFiles(),
 			),
-		)
+		)}
 }
 
 func (m *sidebarCmp) sessionSection() string {
@@ -108,12 +108,12 @@ func (m *sidebarCmp) sessionSection() string {
 	baseStyle := styles.BaseStyle()
 
 	sessionKey := baseStyle.
-		Foreground(t.Primary()).
+		Foreground(lipgloss.Color(t.Primary())).
 		Bold(true).
 		Render("Session")
 
 	sessionValue := baseStyle.
-		Foreground(t.Text()).
+		Foreground(lipgloss.Color(t.Text())).
 		Width(m.width - lipgloss.Width(sessionKey)).
 		Render(fmt.Sprintf(": %s", m.session.Title))
 
@@ -131,12 +131,12 @@ func (m *sidebarCmp) modifiedFile(filePath string, additions, removals int) stri
 	stats := ""
 	if additions > 0 && removals > 0 {
 		additionsStr := baseStyle.
-			Foreground(t.Success()).
+			Foreground(lipgloss.Color(t.Success())).
 			PaddingLeft(1).
 			Render(fmt.Sprintf("+%d", additions))
 
 		removalsStr := baseStyle.
-			Foreground(t.Error()).
+			Foreground(lipgloss.Color(t.Error())).
 			PaddingLeft(1).
 			Render(fmt.Sprintf("-%d", removals))
 
@@ -145,13 +145,13 @@ func (m *sidebarCmp) modifiedFile(filePath string, additions, removals int) stri
 	} else if additions > 0 {
 		additionsStr := fmt.Sprintf(" %s", baseStyle.
 			PaddingLeft(1).
-			Foreground(t.Success()).
+			Foreground(lipgloss.Color(t.Success())).
 			Render(fmt.Sprintf("+%d", additions)))
 		stats = baseStyle.Width(lipgloss.Width(additionsStr)).Render(additionsStr)
 	} else if removals > 0 {
 		removalsStr := fmt.Sprintf(" %s", baseStyle.
 			PaddingLeft(1).
-			Foreground(t.Error()).
+			Foreground(lipgloss.Color(t.Error())).
 			Render(fmt.Sprintf("-%d", removals)))
 		stats = baseStyle.Width(lipgloss.Width(removalsStr)).Render(removalsStr)
 	}
@@ -175,7 +175,7 @@ func (m *sidebarCmp) modifiedFiles() string {
 
 	modifiedFiles := baseStyle.
 		Width(m.width).
-		Foreground(t.Primary()).
+		Foreground(lipgloss.Color(t.Primary())).
 		Bold(true).
 		Render("Modified Files:")
 
@@ -192,7 +192,7 @@ func (m *sidebarCmp) modifiedFiles() string {
 				lipgloss.JoinVertical(
 					lipgloss.Top,
 					modifiedFiles,
-					baseStyle.Foreground(t.TextMuted()).Render(message),
+					baseStyle.Foreground(lipgloss.Color(t.TextMuted())).Render(message),
 				),
 			)
 	}

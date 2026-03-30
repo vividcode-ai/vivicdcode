@@ -1,10 +1,12 @@
 package dialog
 
 import (
-	"github.com/charmbracelet/bubbles/key"
-	tea "github.com/charmbracelet/bubbletea"
-	"github.com/charmbracelet/lipgloss"
+	"charm.land/bubbles/v2/key"
+	tea "charm.land/bubbletea/v2"
+	"charm.land/lipgloss/v2"
+	uv "github.com/charmbracelet/ultraviolet"
 
+	"github.com/vividcode-ai/vividcode/internal/tui/render"
 	"github.com/vividcode-ai/vividcode/internal/tui/styles"
 	"github.com/vividcode-ai/vividcode/internal/tui/theme"
 	"github.com/vividcode-ai/vividcode/internal/tui/util"
@@ -18,8 +20,8 @@ type InitDialogCmp struct {
 }
 
 // NewInitDialogCmp creates a new InitDialogCmp.
-func NewInitDialogCmp() InitDialogCmp {
-	return InitDialogCmp{
+func NewInitDialogCmp() *InitDialogCmp {
+	return &InitDialogCmp{
 		selected: 0,
 		keys:     initDialogKeyMap{},
 	}
@@ -63,12 +65,12 @@ func (k initDialogKeyMap) FullHelp() [][]key.Binding {
 }
 
 // Init implements tea.Model.
-func (m InitDialogCmp) Init() tea.Cmd {
+func (m *InitDialogCmp) Init() tea.Cmd {
 	return nil
 }
 
 // Update implements tea.Model.
-func (m InitDialogCmp) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
+func (m *InitDialogCmp) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	switch msg := msg.(type) {
 	case tea.KeyMsg:
 		switch {
@@ -92,28 +94,28 @@ func (m InitDialogCmp) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 }
 
 // View implements tea.Model.
-func (m InitDialogCmp) View() string {
+func (m *InitDialogCmp) View() tea.View {
 	t := theme.CurrentTheme()
 	baseStyle := styles.BaseStyle()
-	
+
 	// Calculate width needed for content
 	maxWidth := 60 // Width for explanation text
 
 	title := baseStyle.
-		Foreground(t.Primary()).
+		Foreground(lipgloss.Color(t.Primary())).
 		Bold(true).
 		Width(maxWidth).
 		Padding(0, 1).
 		Render("Initialize Project")
 
 	explanation := baseStyle.
-		Foreground(t.Text()).
+		Foreground(lipgloss.Color(t.Text())).
 		Width(maxWidth).
 		Padding(0, 1).
 		Render("Initialization generates a new VividCode.md file that contains information about your codebase, this file serves as memory for each project, you can freely add to it to help the agents be better at their job.")
 
 	question := baseStyle.
-		Foreground(t.Text()).
+		Foreground(lipgloss.Color(t.Text())).
 		Width(maxWidth).
 		Padding(1, 1).
 		Render("Would you like to initialize this project?")
@@ -124,20 +126,20 @@ func (m InitDialogCmp) View() string {
 
 	if m.selected == 0 {
 		yesStyle = yesStyle.
-			Background(t.Primary()).
-			Foreground(t.Background()).
+			Background(lipgloss.Color(t.Primary())).
+			Foreground(lipgloss.Color(t.Background())).
 			Bold(true)
 		noStyle = noStyle.
-			Background(t.Background()).
-			Foreground(t.Primary())
+			Background(lipgloss.Color(t.Background())).
+			Foreground(lipgloss.Color(t.Primary()))
 	} else {
 		noStyle = noStyle.
-			Background(t.Primary()).
-			Foreground(t.Background()).
+			Background(lipgloss.Color(t.Primary())).
+			Foreground(lipgloss.Color(t.Background())).
 			Bold(true)
 		yesStyle = yesStyle.
-			Background(t.Background()).
-			Foreground(t.Primary())
+			Background(lipgloss.Color(t.Background())).
+			Foreground(lipgloss.Color(t.Primary()))
 	}
 
 	yes := yesStyle.Padding(0, 3).Render("Yes")
@@ -159,12 +161,18 @@ func (m InitDialogCmp) View() string {
 		baseStyle.Width(maxWidth).Render(""),
 	)
 
-	return baseStyle.Padding(1, 2).
+	return tea.View{Content: baseStyle.Padding(1, 2).
 		Border(lipgloss.RoundedBorder()).
-		BorderBackground(t.Background()).
-		BorderForeground(t.TextMuted()).
+		BorderBackground(lipgloss.Color(t.Background())).
+		BorderForeground(lipgloss.Color(t.TextMuted())).
 		Width(lipgloss.Width(content) + 4).
-		Render(content)
+		Render(content)}
+}
+
+func (m *InitDialogCmp) Draw(scr uv.Screen, area uv.Rectangle) *tea.Cursor {
+	view := m.View().Content
+	render.DrawCenter(scr, area, view)
+	return nil
 }
 
 // SetSize sets the size of the component.
@@ -174,7 +182,7 @@ func (m *InitDialogCmp) SetSize(width, height int) {
 }
 
 // Bindings implements layout.Bindings.
-func (m InitDialogCmp) Bindings() []key.Binding {
+func (m *InitDialogCmp) Bindings() []key.Binding {
 	return m.keys.ShortHelp()
 }
 

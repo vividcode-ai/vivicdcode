@@ -7,7 +7,7 @@ import (
 	"regexp"
 	"strings"
 
-	tea "github.com/charmbracelet/bubbletea"
+	tea "charm.land/bubbletea/v2"
 	"github.com/vividcode-ai/vividcode/internal/config"
 	"github.com/vividcode-ai/vividcode/internal/tui/util"
 )

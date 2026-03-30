@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"regexp"
 	"strings"
 	"sync"
 	"time"
@@ -25,6 +26,11 @@ var (
 	ErrRequestCancelled = errors.New("request cancelled by user")
 	ErrSessionBusy      = errors.New("session is currently processing another request")
 )
+
+var thinkTagRegex = regexp.MustCompile(`<think>.*?
+</think>
+
+`)
 
 type AgentEventType string
 
@@ -178,7 +184,8 @@ func (a *agent) generateTitle(ctx context.Context, sessionID string, content str
 		return err
 	}
 
-	title := strings.TrimSpace(strings.ReplaceAll(response.Content, "\n", " "))
+	title := thinkTagRegex.ReplaceAllString(response.Content, "")
+	title = strings.TrimSpace(strings.ReplaceAll(title, "\n", " "))
 	if title == "" {
 		return nil
 	}
@@ -731,7 +738,7 @@ func createAgentProvider(agentName config.AgentName) (provider.Provider, error) 
 		provider.WithSystemMessage(prompt.GetAgentPrompt(agentName, model.Provider)),
 		provider.WithMaxTokens(maxTokens),
 	}
-	if model.Provider == models.ProviderOpenAI || model.Provider == models.ProviderLocal && model.CanReason {
+	if (model.Provider == models.ProviderOpenAI || model.Provider == models.ProviderLocal) && model.CanReason {
 		opts = append(
 			opts,
 			provider.WithOpenAIOptions(
