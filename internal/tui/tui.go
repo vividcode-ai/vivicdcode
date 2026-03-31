@@ -311,17 +311,17 @@ func (a *appModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case tea.MouseWheelMsg:
 		if a.currentPage == page.ChatPage {
 			if scroller, ok := a.pages[a.currentPage].(interface {
-				ScrollBy(lines int)
+				ScrollBy(lines int) tea.Cmd
 			}); ok {
 				switch msg.Button {
 				case tea.MouseWheelUp:
-					scroller.ScrollBy(-5)
+					cmds = append(cmds, scroller.ScrollBy(-5))
 				case tea.MouseWheelDown:
-					scroller.ScrollBy(5)
+					cmds = append(cmds, scroller.ScrollBy(5))
 				}
 			}
 		}
-		return a, nil
+		return a, tea.Batch(cmds...)
 	case util.InfoMsg:
 		s, cmd := a.status.Update(msg)
 		a.status = s.(core.StatusCmp)
@@ -552,6 +552,9 @@ func (a *appModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		switch {
 
 		case key.Matches(msg, keys.Quit):
+			if a.showQuit {
+				return a, tea.Quit
+			}
 			a.showQuit = !a.showQuit
 			if a.showHelp {
 				a.showHelp = false

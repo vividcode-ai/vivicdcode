@@ -11,6 +11,7 @@ import (
 	"charm.land/lipgloss/v2"
 	uv "github.com/charmbracelet/ultraviolet"
 	"github.com/vividcode-ai/vividcode/internal/app"
+	"github.com/vividcode-ai/vividcode/internal/logging"
 	"github.com/vividcode-ai/vividcode/internal/message"
 	"github.com/vividcode-ai/vividcode/internal/pubsub"
 	"github.com/vividcode-ai/vividcode/internal/session"
@@ -123,6 +124,11 @@ func (m *messagesCmp) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case renderFinishedMsg:
 		m.rendering = false
 
+	case ForceFollowMsg:
+		logging.Debug("ForceFollowMsg received, setting follow = true")
+		m.follow = true
+		return m, nil
+
 	case pubsub.Event[session.Session]:
 		if msg.Type == pubsub.UpdatedEvent && msg.Payload.ID == m.session.ID {
 			m.session = msg.Payload
@@ -132,16 +138,16 @@ func (m *messagesCmp) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		}
 
 	case pubsub.Event[message.Message]:
-		if msg.Payload.SessionID != m.session.ID {
-			break
-		}
+		logging.Debug("message event received", "type", msg.Type, "messageID", msg.Payload.ID)
 		if msg.Type == pubsub.CreatedEvent {
 			if _, exists := m.idIndexMap[msg.Payload.ID]; !exists {
+				logging.Debug("new message, follow", "follow", m.follow)
 				m.messages = append(m.messages, msg.Payload)
 				m.idIndexMap[msg.Payload.ID] = len(m.messages) - 1
 				m.currentMsgID = msg.Payload.ID
 				m.vlist.AppendItems(newMsgItem(msg.Payload))
 				if m.follow {
+					logging.Debug("scrolling to bottom")
 					m.vlist.ScrollToBottom()
 				}
 			}
@@ -371,9 +377,14 @@ func (m *messagesCmp) SetSession(s session.Session) tea.Cmd {
 	return func() tea.Msg { return renderFinishedMsg{} }
 }
 
-func (m *messagesCmp) ScrollBy(lines int) {
-	m.vlist.ScrollBy(lines)
-	m.follow = lines > 0 && m.vlist.AtBottom()
+func (m *messagesCmp) ScrollBy(lines int) tea.Cmd {
+	cmd := m.vlist.ScrollBy(lines)
+	if lines < 0 {
+		m.follow = !m.vlist.AtTop()
+	} else if lines > 0 {
+		m.follow = m.vlist.AtBottom()
+	}
+	return cmd
 }
 
 func (m *messagesCmp) BindingKeys() []key.Binding {
@@ -396,5 +407,6 @@ func NewMessagesCmp(app *app.App) tea.Model {
 		spinner:    s,
 		vlist:      vlist,
 		idIndexMap: make(map[string]int),
+		follow:     true,
 	}
 }

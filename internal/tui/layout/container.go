@@ -14,7 +14,7 @@ type Container interface {
 	Bindings
 	Draw(scr uv.Screen, area uv.Rectangle) *tea.Cursor
 	GetCursor() tea.Cursor
-	ScrollBy(lines int)
+	ScrollBy(lines int) tea.Cmd
 }
 type container struct {
 	width  int
@@ -138,10 +138,11 @@ func (c *container) GetCursor() tea.Cursor {
 	return tea.Cursor{}
 }
 
-func (c *container) ScrollBy(lines int) {
-	if scrollable, ok := c.content.(interface{ ScrollBy(lines int) }); ok {
-		scrollable.ScrollBy(lines)
+func (c *container) ScrollBy(lines int) tea.Cmd {
+	if scrollable, ok := c.content.(interface{ ScrollBy(lines int) tea.Cmd }); ok {
+		return scrollable.ScrollBy(lines)
 	}
+	return nil
 }
 
 type ContainerOption func(*container)

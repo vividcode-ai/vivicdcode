@@ -3,6 +3,7 @@ package chat
 import (
 	"strings"
 
+	tea "charm.land/bubbletea/v2"
 	uv "github.com/charmbracelet/ultraviolet"
 )
 
@@ -114,6 +115,10 @@ func (l *VirtualList) AtBottom() bool {
 	return remaining <= l.height
 }
 
+func (l *VirtualList) AtTop() bool {
+	return l.offsetIdx == 0 && l.offsetLine == 0
+}
+
 func (l *VirtualList) lastOffsetItem() (int, int, int) {
 	var totalHeight int
 	var idx int
@@ -172,9 +177,9 @@ func (l *VirtualList) ScrollToBottom() {
 	l.offsetLine = lastOffsetLine
 }
 
-func (l *VirtualList) ScrollBy(lines int) {
+func (l *VirtualList) ScrollBy(lines int) tea.Cmd {
 	if len(l.items) == 0 || lines == 0 {
-		return
+		return nil
 	}
 
 	if l.reverse {
@@ -183,7 +188,7 @@ func (l *VirtualList) ScrollBy(lines int) {
 
 	if lines > 0 {
 		if l.AtBottom() {
-			return
+			return nil
 		}
 		l.offsetLine += lines
 		currentItem := l.getItem(l.offsetIdx)
@@ -195,7 +200,7 @@ func (l *VirtualList) ScrollBy(lines int) {
 			l.offsetIdx++
 			if l.offsetIdx > len(l.items)-1 {
 				l.ScrollToBottom()
-				return
+				return nil
 			}
 			currentItem = l.getItem(l.offsetIdx)
 		}
@@ -205,25 +210,21 @@ func (l *VirtualList) ScrollBy(lines int) {
 			l.offsetLine = lastOffsetLine
 		}
 	} else if lines < 0 {
-		if l.offsetIdx <= 0 && l.offsetLine <= 0 {
-			return
-		}
 		l.offsetLine += lines
 		for l.offsetLine < 0 {
-			l.offsetIdx--
-			if l.offsetIdx < 0 {
+			l.offsetLine += l.getItem(l.offsetIdx).height
+			if l.gap > 0 {
+				l.offsetLine -= l.gap
+			}
+			l.offsetIdx++
+			if l.offsetIdx >= len(l.items) {
 				l.offsetIdx = 0
 				l.offsetLine = 0
-				break
+				return nil
 			}
-			prevItem := l.getItem(l.offsetIdx)
-			totalHeight := prevItem.height
-			if l.gap > 0 {
-				totalHeight += l.gap
-			}
-			l.offsetLine += totalHeight
 		}
 	}
+	return nil
 }
 
 func (l *VirtualList) PageDown() {
