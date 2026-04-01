@@ -119,6 +119,8 @@ func (m *editorCmp) Init() tea.Cmd {
 	return textarea.Blink
 }
 
+type tickMsg struct{}
+
 func (m *editorCmp) send() tea.Cmd {
 	if m.app.CoderAgent.IsSessionBusy(m.session.ID) {
 		return util.ReportWarn("Agent is working, please wait...")
@@ -331,6 +333,10 @@ func CreateTextArea(existing *textarea.Model) textarea.Model {
 	ta.SetStyles(textarea.Styles{
 		Focused: focusedStyles,
 		Blurred: blurredStyles,
+		Cursor: textarea.CursorStyle{
+			Shape: tea.CursorBlock,
+			Blink: true,
+		},
 	})
 
 	ta.Prompt = " "

@@ -128,6 +128,13 @@ func (c *container) BindingKeys() []key.Binding {
 func (c *container) Draw(scr uv.Screen, area uv.Rectangle) *tea.Cursor {
 	view := c.View().Content
 	uv.NewStyledString(view).Draw(scr, area)
+	// Return cursor from content if focused
+	if cursorModel, ok := c.content.(interface{ GetCursor() tea.Cursor }); ok {
+		cur := cursorModel.GetCursor()
+		if cur.X != 0 || cur.Y != 0 {
+			return &cur
+		}
+	}
 	return nil
 }
 
