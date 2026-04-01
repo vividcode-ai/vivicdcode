@@ -16,6 +16,7 @@ import (
 	"github.com/vividcode-ai/vividcode/internal/config"
 	"github.com/vividcode-ai/vividcode/internal/llm/agent"
 	"github.com/vividcode-ai/vividcode/internal/logging"
+	"github.com/vividcode-ai/vividcode/internal/message"
 	"github.com/vividcode-ai/vividcode/internal/permission"
 	"github.com/vividcode-ai/vividcode/internal/pubsub"
 	"github.com/vividcode-ai/vividcode/internal/session"
@@ -497,6 +498,12 @@ func (a *appModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case pubsub.Event[session.Session]:
 		if msg.Type == pubsub.UpdatedEvent && msg.Payload.ID == a.selectedSession.ID {
 			a.selectedSession = msg.Payload
+		}
+
+	case pubsub.Event[message.Message]:
+		if a.currentPage == page.ChatPage {
+			a.pages[a.currentPage], cmd = a.pages[a.currentPage].Update(msg)
+			cmds = append(cmds, cmd)
 		}
 	case dialog.SessionSelectedMsg:
 		a.showSessionDialog = false

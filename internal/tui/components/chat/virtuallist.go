@@ -212,16 +212,17 @@ func (l *VirtualList) ScrollBy(lines int) tea.Cmd {
 	} else if lines < 0 {
 		l.offsetLine += lines
 		for l.offsetLine < 0 {
-			l.offsetLine += l.getItem(l.offsetIdx).height
+			l.offsetIdx--
+			if l.offsetIdx < 0 {
+				l.ScrollToTop()
+				break
+			}
+			prevItem := l.getItem(l.offsetIdx)
+			totalHeight := prevItem.height
 			if l.gap > 0 {
-				l.offsetLine -= l.gap
+				totalHeight += l.gap
 			}
-			l.offsetIdx++
-			if l.offsetIdx >= len(l.items) {
-				l.offsetIdx = 0
-				l.offsetLine = 0
-				return nil
-			}
+			l.offsetLine += totalHeight
 		}
 	}
 	return nil

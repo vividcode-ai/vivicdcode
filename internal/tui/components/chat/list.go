@@ -102,27 +102,22 @@ func (m *messagesCmp) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 	case tea.KeyMsg:
 		if key.Matches(msg, messageKeys.PageDown) {
-			m.vlist.PageDown()
-			m.follow = false
+			m.ScrollBy(m.height)
 		} else if key.Matches(msg, messageKeys.PageUp) {
-			m.vlist.PageUp()
-			m.follow = false
+			m.ScrollBy(-m.height)
 		} else if key.Matches(msg, messageKeys.HalfPageUp) {
-			m.vlist.HalfPageUp()
-			m.follow = false
+			m.ScrollBy(-m.height / 2)
 		} else if key.Matches(msg, messageKeys.HalfPageDown) {
-			m.vlist.HalfPageDown()
-			m.follow = false
+			m.ScrollBy(m.height / 2)
 		} else if key.Matches(msg, messageKeys.ScrollUp) {
-			m.vlist.ScrollUp()
-			m.follow = false
+			m.ScrollBy(-1)
 		} else if key.Matches(msg, messageKeys.ScrollDown) {
-			m.vlist.ScrollDown()
-			m.follow = false
+			m.ScrollBy(1)
 		}
 
 	case renderFinishedMsg:
 		m.rendering = false
+		m.vlist.ScrollToBottom()
 
 	case ForceFollowMsg:
 		logging.Debug("ForceFollowMsg received, setting follow = true")
@@ -138,6 +133,9 @@ func (m *messagesCmp) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		}
 
 	case pubsub.Event[message.Message]:
+		if msg.Payload.SessionID != m.session.ID {
+			return m, nil
+		}
 		logging.Debug("message event received", "type", msg.Type, "messageID", msg.Payload.ID)
 		if msg.Type == pubsub.CreatedEvent {
 			if _, exists := m.idIndexMap[msg.Payload.ID]; !exists {
@@ -155,6 +153,9 @@ func (m *messagesCmp) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			if idx, exists := m.idIndexMap[msg.Payload.ID]; exists {
 				m.messages[idx] = msg.Payload
 				m.vlist.UpdateItem(idx, newMsgItem(msg.Payload))
+				if m.follow {
+					m.vlist.ScrollToBottom()
+				}
 			}
 		}
 	}
@@ -379,10 +380,10 @@ func (m *messagesCmp) SetSession(s session.Session) tea.Cmd {
 
 func (m *messagesCmp) ScrollBy(lines int) tea.Cmd {
 	cmd := m.vlist.ScrollBy(lines)
-	if lines < 0 {
-		m.follow = !m.vlist.AtTop()
-	} else if lines > 0 {
+	if lines > 0 {
 		m.follow = m.vlist.AtBottom()
+	} else {
+		m.follow = false
 	}
 	return cmd
 }
