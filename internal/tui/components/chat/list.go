@@ -143,7 +143,7 @@ func (m *messagesCmp) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				m.messages = append(m.messages, msg.Payload)
 				m.idIndexMap[msg.Payload.ID] = len(m.messages) - 1
 				m.currentMsgID = msg.Payload.ID
-				m.vlist.AppendItems(newMsgItem(msg.Payload))
+				m.vlist.AppendItems(newMsgItem(msg.Payload, m.messages, m.app.Messages))
 				if m.follow {
 					logging.Debug("scrolling to bottom")
 					m.vlist.ScrollToBottom()
@@ -152,7 +152,7 @@ func (m *messagesCmp) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		} else if msg.Type == pubsub.UpdatedEvent {
 			if idx, exists := m.idIndexMap[msg.Payload.ID]; exists {
 				m.messages[idx] = msg.Payload
-				m.vlist.UpdateItem(idx, newMsgItem(msg.Payload))
+				m.vlist.UpdateItem(idx, newMsgItem(msg.Payload, m.messages, m.app.Messages))
 				if m.follow {
 					m.vlist.ScrollToBottom()
 				}
@@ -167,7 +167,7 @@ func (m *messagesCmp) IsAgentWorking() bool {
 }
 
 func (m *messagesCmp) updateList() {
-	items := messagesToItems(m.messages)
+	items := messagesToItems(m.messages, m.app.Messages)
 	m.vlist.SetItems(items)
 }
 
@@ -337,7 +337,7 @@ func (m *messagesCmp) initialScreen() string {
 }
 
 func (m *messagesCmp) rerender() {
-	m.vlist.SetItems(messagesToItems(m.messages))
+	m.vlist.SetItems(messagesToItems(m.messages, m.app.Messages))
 }
 
 func (m *messagesCmp) SetSize(width, height int) tea.Cmd {

@@ -11,6 +11,7 @@ type Item interface {
 	ID() string
 	Render(width int) string
 	Height(width int) int
+	RenderMulti(width int) []Item
 }
 
 type VirtualList struct {

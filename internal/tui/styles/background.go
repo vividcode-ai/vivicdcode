@@ -120,3 +120,94 @@ func ForceReplaceBackgroundWithLipgloss(input string, newBgColor color.Color) st
 		return "\x1b[" + sb.String() + "m"
 	})
 }
+
+func ForceReplaceForegroundAndBackgroundWithLipgloss(input string, newFgColor color.Color, newBgColor color.Color) string {
+	fgR, fgG, fgB := getColorRGB(newFgColor)
+	bgR, bgG, bgB := getColorRGB(newBgColor)
+
+	newFg := fmt.Sprintf("38;2;%d;%d;%d", fgR, fgG, fgB)
+	newBg := fmt.Sprintf("48;2;%d;%d;%d", bgR, bgG, bgB)
+
+	return ansiEscape.ReplaceAllStringFunc(input, func(seq string) string {
+		const (
+			escPrefixLen = 2
+			escSuffixLen = 1
+		)
+
+		raw := seq
+		start := escPrefixLen
+		end := len(raw) - escSuffixLen
+
+		var sb strings.Builder
+		sb.Grow((end - start) + len(newFg) + len(newBg) + 4)
+
+		for i := start; i < end; {
+			j := i
+			for j < end && raw[j] != ';' {
+				j++
+			}
+			token := raw[i:j]
+
+			if len(token) == 2 && token[0] == '4' && token[1] == '8' {
+				k := j + 1
+				if k < end {
+					l := k
+					for l < end && raw[l] != ';' {
+						l++
+					}
+					next := raw[k:l]
+					if next == "5" {
+						m := l + 1
+						for m < end && raw[m] != ';' {
+							m++
+						}
+						i = m + 1
+						continue
+					} else if next == "2" {
+						m := l + 1
+						for count := 0; count < 3 && m < end; count++ {
+							for m < end && raw[m] != ';' {
+								m++
+							}
+							m++
+						}
+						i = m
+						continue
+					}
+				}
+			}
+
+			isNum := true
+			val := 0
+			for p := i; p < j; p++ {
+				c := raw[p]
+				if c < '0' || c > '9' {
+					isNum = false
+					break
+				}
+				val = val*10 + int(c-'0')
+			}
+
+			keep := !isNum ||
+				((val < 30 || val > 37) && (val < 90 || val > 97) &&
+					(val < 40 || val > 47) && (val < 100 || val > 107) && val != 49)
+
+			if keep {
+				if sb.Len() > 0 {
+					sb.WriteByte(';')
+				}
+				sb.WriteString(token)
+			}
+			i = j + 1
+		}
+
+		if sb.Len() > 0 {
+			sb.WriteByte(';')
+		}
+		sb.WriteString(newFg)
+		sb.WriteByte(';')
+		sb.WriteString(newBg)
+
+		return "\x1b[" + sb.String() + "m"
+	})
+}

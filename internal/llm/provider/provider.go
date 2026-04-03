@@ -36,6 +36,7 @@ type TokenUsage struct {
 
 type ProviderResponse struct {
 	Content      string
+	Thinking     string
 	ToolCalls    []message.ToolCall
 	Usage        TokenUsage
 	FinishReason message.FinishReason
@@ -158,12 +159,12 @@ func NewProvider(providerName models.ModelProvider, opts ...ProviderClientOption
 			client:  newOpenAIClient(clientOptions),
 		}, nil
 	case models.ProviderMiniMax:
-		clientOptions.openaiOptions = append(clientOptions.openaiOptions,
-			WithOpenAIBaseURL("https://api.minimax.chat/v1"),
+		clientOptions.anthropicOptions = append(clientOptions.anthropicOptions,
+			WithAnthropicBaseURL("https://api.minimaxi.com/anthropic"),
 		)
-		return &baseProvider[OpenAIClient]{
+		return &baseProvider[AnthropicClient]{
 			options: clientOptions,
-			client:  newOpenAIClient(clientOptions),
+			client:  newAnthropicClient(clientOptions),
 		}, nil
 	case models.ProviderMock:
 		// TODO: implement mock client for test
@@ -224,6 +225,12 @@ func WithSystemMessage(systemMessage string) ProviderClientOption {
 func WithAnthropicOptions(anthropicOptions ...AnthropicOption) ProviderClientOption {
 	return func(options *providerClientOptions) {
 		options.anthropicOptions = anthropicOptions
+	}
+}
+
+func WithAnthropicBaseURL(baseURL string) AnthropicOption {
+	return func(options *anthropicOptions) {
+		options.baseURL = baseURL
 	}
 }
 
