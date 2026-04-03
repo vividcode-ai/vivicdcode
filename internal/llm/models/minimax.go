@@ -18,6 +18,7 @@ var MiniMaxModels = map[ModelID]Model{
 		ContextWindow:       1_000_000,
 		DefaultMaxTokens:    32_768,
 		SupportsAttachments: false,
+		CanReason:           true,
 	},
 	MiniMaxM2_5: {
 		ID:                  MiniMaxM2_5,
@@ -31,5 +32,6 @@ var MiniMaxModels = map[ModelID]Model{
 		ContextWindow:       1_000_000,
 		DefaultMaxTokens:    32_768,
 		SupportsAttachments: false,
+		CanReason:           true,
 	},
 }

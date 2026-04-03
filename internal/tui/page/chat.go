@@ -173,6 +173,9 @@ func (p *chatPage) sendMessage(text string, attachments []message.Attachment) te
 	if err != nil {
 		return util.ReportError(err)
 	}
+
+	cmds = append(cmds, util.CmdHandler(chat.ForceFollowMsg{}))
+
 	return tea.Batch(cmds...)
 }
 
@@ -180,10 +183,11 @@ func (p *chatPage) SetSize(width, height int) tea.Cmd {
 	return p.layout.SetSize(width, height)
 }
 
-func (p *chatPage) ScrollBy(lines int) {
-	if scroller, ok := p.layout.(interface{ ScrollBy(lines int) }); ok {
-		scroller.ScrollBy(lines)
+func (p *chatPage) ScrollBy(lines int) tea.Cmd {
+	if scroller, ok := p.layout.(interface{ ScrollBy(lines int) tea.Cmd }); ok {
+		return scroller.ScrollBy(lines)
 	}
+	return nil
 }
 
 func (p *chatPage) GetSize() (int, int) {

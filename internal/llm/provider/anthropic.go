@@ -22,6 +22,7 @@ import (
 type anthropicOptions struct {
 	useBedrock   bool
 	disableCache bool
+	baseURL      string
 	shouldThink  func(userMessage string) bool
 }
 
@@ -44,6 +45,9 @@ func newAnthropicClient(opts providerClientOptions) AnthropicClient {
 	anthropicClientOptions := []option.RequestOption{}
 	if opts.apiKey != "" {
 		anthropicClientOptions = append(anthropicClientOptions, option.WithAPIKey(opts.apiKey))
+	}
+	if anthropicOpts.baseURL != "" {
+		anthropicClientOptions = append(anthropicClientOptions, option.WithBaseURL(anthropicOpts.baseURL))
 	}
 	if anthropicOpts.useBedrock {
 		anthropicClientOptions = append(anthropicClientOptions, bedrock.WithLoadDefaultConfig(context.Background()))
@@ -161,19 +165,26 @@ func (a *anthropicClient) finishReason(reason string) message.FinishReason {
 
 func (a *anthropicClient) preparedMessages(messages []anthropic.MessageParam, tools []anthropic.ToolUnionParam) anthropic.MessageNewParams {
 	var thinkingParam anthropic.ThinkingConfigParamUnion
-	lastMessage := messages[len(messages)-1]
-	isUser := lastMessage.Role == anthropic.MessageParamRoleUser
-	messageContent := ""
 	temperature := anthropic.Float(0)
-	if isUser {
-		for _, m := range lastMessage.Content {
-			if m.OfText != nil && m.OfText.Text != "" {
-				messageContent = m.OfText.Text
+
+	// For models that support reasoning, always enable thinking
+	if a.providerOptions.model.CanReason {
+		thinkingParam = anthropic.ThinkingConfigParamOfEnabled(int64(float64(a.providerOptions.maxTokens) * 0.8))
+		temperature = anthropic.Float(1)
+	} else {
+		lastMessage := messages[len(messages)-1]
+		isUser := lastMessage.Role == anthropic.MessageParamRoleUser
+		messageContent := ""
+		if isUser {
+			for _, m := range lastMessage.Content {
+				if m.OfText != nil && m.OfText.Text != "" {
+					messageContent = m.OfText.Text
+				}
 			}
-		}
-		if messageContent != "" && a.options.shouldThink != nil && a.options.shouldThink(messageContent) {
-			thinkingParam = anthropic.ThinkingConfigParamOfEnabled(int64(float64(a.providerOptions.maxTokens) * 0.8))
-			temperature = anthropic.Float(1)
+			if messageContent != "" && a.options.shouldThink != nil && a.options.shouldThink(messageContent) {
+				thinkingParam = anthropic.ThinkingConfigParamOfEnabled(int64(float64(a.providerOptions.maxTokens) * 0.8))
+				temperature = anthropic.Float(1)
+			}
 		}
 	}
 
@@ -230,14 +241,19 @@ func (a *anthropicClient) send(ctx context.Context, messages []message.Message, 
 		}
 
 		content := ""
+		thinking := ""
 		for _, block := range anthropicResponse.Content {
 			if text, ok := block.AsAny().(anthropic.TextBlock); ok {
 				content += text.Text
+			}
+			if tb, ok := block.AsAny().(anthropic.ThinkingBlock); ok {
+				thinking += tb.Thinking
 			}
 		}
 
 		return &ProviderResponse{
 			Content:   content,
+			Thinking:  thinking,
 			ToolCalls: a.toolCalls(*anthropicResponse),
 			Usage:     a.usage(*anthropicResponse),
 		}, nil
@@ -337,9 +353,13 @@ func (a *anthropicClient) stream(ctx context.Context, messages []message.Message
 
 				case anthropic.MessageStopEvent:
 					content := ""
+					thinking := ""
 					for _, block := range accumulatedMessage.Content {
 						if text, ok := block.AsAny().(anthropic.TextBlock); ok {
 							content += text.Text
+						}
+						if tb, ok := block.AsAny().(anthropic.ThinkingBlock); ok {
+							thinking += tb.Thinking
 						}
 					}
 
@@ -347,6 +367,7 @@ func (a *anthropicClient) stream(ctx context.Context, messages []message.Message
 						Type: EventComplete,
 						Response: &ProviderResponse{
 							Content:      content,
+							Thinking:     thinking,
 							ToolCalls:    a.toolCalls(accumulatedMessage),
 							Usage:        a.usage(accumulatedMessage),
 							FinishReason: a.finishReason(string(accumulatedMessage.StopReason)),

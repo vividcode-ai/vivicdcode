@@ -16,6 +16,7 @@ import (
 	"github.com/vividcode-ai/vividcode/internal/config"
 	"github.com/vividcode-ai/vividcode/internal/llm/agent"
 	"github.com/vividcode-ai/vividcode/internal/logging"
+	"github.com/vividcode-ai/vividcode/internal/message"
 	"github.com/vividcode-ai/vividcode/internal/permission"
 	"github.com/vividcode-ai/vividcode/internal/pubsub"
 	"github.com/vividcode-ai/vividcode/internal/session"
@@ -311,17 +312,17 @@ func (a *appModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case tea.MouseWheelMsg:
 		if a.currentPage == page.ChatPage {
 			if scroller, ok := a.pages[a.currentPage].(interface {
-				ScrollBy(lines int)
+				ScrollBy(lines int) tea.Cmd
 			}); ok {
 				switch msg.Button {
 				case tea.MouseWheelUp:
-					scroller.ScrollBy(-5)
+					cmds = append(cmds, scroller.ScrollBy(-5))
 				case tea.MouseWheelDown:
-					scroller.ScrollBy(5)
+					cmds = append(cmds, scroller.ScrollBy(5))
 				}
 			}
 		}
-		return a, nil
+		return a, tea.Batch(cmds...)
 	case util.InfoMsg:
 		s, cmd := a.status.Update(msg)
 		a.status = s.(core.StatusCmp)
@@ -498,6 +499,12 @@ func (a *appModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		if msg.Type == pubsub.UpdatedEvent && msg.Payload.ID == a.selectedSession.ID {
 			a.selectedSession = msg.Payload
 		}
+
+	case pubsub.Event[message.Message]:
+		if a.currentPage == page.ChatPage {
+			a.pages[a.currentPage], cmd = a.pages[a.currentPage].Update(msg)
+			cmds = append(cmds, cmd)
+		}
 	case dialog.SessionSelectedMsg:
 		a.showSessionDialog = false
 		if a.currentPage == page.ChatPage {
@@ -552,6 +559,9 @@ func (a *appModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		switch {
 
 		case key.Matches(msg, keys.Quit):
+			if a.showQuit {
+				return a, tea.Quit
+			}
 			a.showQuit = !a.showQuit
 			if a.showHelp {
 				a.showHelp = false

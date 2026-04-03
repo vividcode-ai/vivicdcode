@@ -22,7 +22,7 @@ type SplitPaneLayout interface {
 	ClearRightPanel() tea.Cmd
 	ClearBottomPanel() tea.Cmd
 
-	ScrollBy(lines int)
+	ScrollBy(lines int) tea.Cmd
 
 	Draw(scr uv.Screen, area uv.Rectangle) *tea.Cursor
 }
@@ -317,10 +317,11 @@ func WithBottomPanelFixed(panel Container, fixedHeight int) SplitPaneOption {
 	}
 }
 
-func (s *splitPaneLayout) ScrollBy(lines int) {
+func (s *splitPaneLayout) ScrollBy(lines int) tea.Cmd {
 	if s.leftPanel != nil {
-		if scrollable, ok := s.leftPanel.(interface{ ScrollBy(lines int) }); ok {
-			scrollable.ScrollBy(lines)
+		if scrollable, ok := s.leftPanel.(interface{ ScrollBy(lines int) tea.Cmd }); ok {
+			return scrollable.ScrollBy(lines)
 		}
 	}
+	return nil
 }

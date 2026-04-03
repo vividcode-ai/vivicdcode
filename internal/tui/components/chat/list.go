@@ -11,6 +11,7 @@ import (
 	"charm.land/lipgloss/v2"
 	uv "github.com/charmbracelet/ultraviolet"
 	"github.com/vividcode-ai/vividcode/internal/app"
+	"github.com/vividcode-ai/vividcode/internal/logging"
 	"github.com/vividcode-ai/vividcode/internal/message"
 	"github.com/vividcode-ai/vividcode/internal/pubsub"
 	"github.com/vividcode-ai/vividcode/internal/session"
@@ -101,27 +102,27 @@ func (m *messagesCmp) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 	case tea.KeyMsg:
 		if key.Matches(msg, messageKeys.PageDown) {
-			m.vlist.PageDown()
-			m.follow = false
+			m.ScrollBy(m.height)
 		} else if key.Matches(msg, messageKeys.PageUp) {
-			m.vlist.PageUp()
-			m.follow = false
+			m.ScrollBy(-m.height)
 		} else if key.Matches(msg, messageKeys.HalfPageUp) {
-			m.vlist.HalfPageUp()
-			m.follow = false
+			m.ScrollBy(-m.height / 2)
 		} else if key.Matches(msg, messageKeys.HalfPageDown) {
-			m.vlist.HalfPageDown()
-			m.follow = false
+			m.ScrollBy(m.height / 2)
 		} else if key.Matches(msg, messageKeys.ScrollUp) {
-			m.vlist.ScrollUp()
-			m.follow = false
+			m.ScrollBy(-1)
 		} else if key.Matches(msg, messageKeys.ScrollDown) {
-			m.vlist.ScrollDown()
-			m.follow = false
+			m.ScrollBy(1)
 		}
 
 	case renderFinishedMsg:
 		m.rendering = false
+		m.vlist.ScrollToBottom()
+
+	case ForceFollowMsg:
+		logging.Debug("ForceFollowMsg received, setting follow = true")
+		m.follow = true
+		return m, nil
 
 	case pubsub.Event[session.Session]:
 		if msg.Type == pubsub.UpdatedEvent && msg.Payload.ID == m.session.ID {
@@ -133,22 +134,28 @@ func (m *messagesCmp) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 	case pubsub.Event[message.Message]:
 		if msg.Payload.SessionID != m.session.ID {
-			break
+			return m, nil
 		}
+		logging.Debug("message event received", "type", msg.Type, "messageID", msg.Payload.ID)
 		if msg.Type == pubsub.CreatedEvent {
 			if _, exists := m.idIndexMap[msg.Payload.ID]; !exists {
+				logging.Debug("new message, follow", "follow", m.follow)
 				m.messages = append(m.messages, msg.Payload)
 				m.idIndexMap[msg.Payload.ID] = len(m.messages) - 1
 				m.currentMsgID = msg.Payload.ID
-				m.vlist.AppendItems(newMsgItem(msg.Payload))
+				m.vlist.AppendItems(newMsgItem(msg.Payload, m.messages, m.app.Messages))
 				if m.follow {
+					logging.Debug("scrolling to bottom")
 					m.vlist.ScrollToBottom()
 				}
 			}
 		} else if msg.Type == pubsub.UpdatedEvent {
 			if idx, exists := m.idIndexMap[msg.Payload.ID]; exists {
 				m.messages[idx] = msg.Payload
-				m.vlist.UpdateItem(idx, newMsgItem(msg.Payload))
+				m.vlist.UpdateItem(idx, newMsgItem(msg.Payload, m.messages, m.app.Messages))
+				if m.follow {
+					m.vlist.ScrollToBottom()
+				}
 			}
 		}
 	}
@@ -160,7 +167,7 @@ func (m *messagesCmp) IsAgentWorking() bool {
 }
 
 func (m *messagesCmp) updateList() {
-	items := messagesToItems(m.messages)
+	items := messagesToItems(m.messages, m.app.Messages)
 	m.vlist.SetItems(items)
 }
 
@@ -330,7 +337,7 @@ func (m *messagesCmp) initialScreen() string {
 }
 
 func (m *messagesCmp) rerender() {
-	m.vlist.SetItems(messagesToItems(m.messages))
+	m.vlist.SetItems(messagesToItems(m.messages, m.app.Messages))
 }
 
 func (m *messagesCmp) SetSize(width, height int) tea.Cmd {
@@ -371,9 +378,14 @@ func (m *messagesCmp) SetSession(s session.Session) tea.Cmd {
 	return func() tea.Msg { return renderFinishedMsg{} }
 }
 
-func (m *messagesCmp) ScrollBy(lines int) {
-	m.vlist.ScrollBy(lines)
-	m.follow = lines > 0 && m.vlist.AtBottom()
+func (m *messagesCmp) ScrollBy(lines int) tea.Cmd {
+	cmd := m.vlist.ScrollBy(lines)
+	if lines > 0 {
+		m.follow = m.vlist.AtBottom()
+	} else {
+		m.follow = false
+	}
+	return cmd
 }
 
 func (m *messagesCmp) BindingKeys() []key.Binding {
@@ -396,5 +408,6 @@ func NewMessagesCmp(app *app.App) tea.Model {
 		spinner:    s,
 		vlist:      vlist,
 		idIndexMap: make(map[string]int),
+		follow:     true,
 	}
 }
